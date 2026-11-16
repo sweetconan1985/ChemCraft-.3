@@ -193,6 +193,9 @@
           <button id="btnCopyAppsScript" type="button" class="px-4 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/50 text-emerald-200 font-bold text-xs transition">
             📋 คัดลอกโค้ด Apps Script (doPost)
           </button>
+          <button id="btnTestSheet" type="button" class="px-4 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/50 text-amber-200 font-bold text-xs transition">
+            🧪 ทดสอบส่งแถวตัวอย่างเข้า Sheet
+          </button>
         </div>
         <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-700 text-[11px] text-slate-300 space-y-1">
           <div class="font-bold text-cyan-300">วิธีติดตั้งใน Google Sheets (1 นาที):</div>
@@ -479,6 +482,7 @@
         await fetch(url, {
           method: 'POST',
           mode: 'no-cors',
+          keepalive: true,
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify(payload)
         });
@@ -2303,16 +2307,46 @@
       } catch (_) {}
     });
 
+    document.getElementById('btnTestSheet').addEventListener('click', async () => {
+      SoundFX.click();
+      const ok = await sendToGoogleSheet('ทดสอบการเชื่อมต่อ (TEST)');
+      if (ok) {
+        showToast('ส่งข้อมูลทดสอบแล้ว! กรุณาเช็กแถวใหม่ใน Google Sheet', 'success');
+      } else {
+        showToast('ยังไม่ได้ใส่ URL หรือ URL ไม่ถูกต้อง (ต้องขึ้นต้นด้วย https://)', 'error');
+      }
+    });
+
     document.getElementById('btnCopyAppsScript').addEventListener('click', () => {
       SoundFX.click();
       const gasCode = `function doPost(e) {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow(["Timestamp","PlayerCode","PlayerName","Event","Stage","TotalScore","Percent","Level","EcoPoints","HP","S1","S2","S3","S4","S5"]);
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow(["Timestamp","PlayerCode","PlayerName","Event","Stage","TotalScore","Percent","Level","EcoPoints","HP","S1","S2","S3","S4","S5"]);
+    }
+    var d = JSON.parse(e.postData.contents);
+    var code = String(d.playerCode || "").trim().toUpperCase();
+    var rowData = [d.timestamp, code, d.playerName, d.event, d.stage, d.totalScore, d.percent, d.level, d.ecoPoints, d.hp, d.s1, d.s2, d.s3, d.s4, d.s5];
+    var values = sheet.getDataRange().getValues();
+    var foundRow = -1;
+    for (var i = 1; i < values.length; i++) {
+      if (String(values[i][1] || "").trim().toUpperCase() === code && code !== "") {
+        foundRow = i + 1;
+        break;
+      }
+    }
+    if (foundRow > 0) {
+      sheet.getRange(foundRow, 1, 1, rowData.length).setValues([rowData]);
+    } else {
+      sheet.appendRow(rowData);
+    }
+    return ContentService.createTextOutput(JSON.stringify({status:"ok"})).setMimeType(ContentService.MimeType.JSON);
+  } finally {
+    lock.releaseLock();
   }
-  var d = JSON.parse(e.postData.contents);
-  sheet.appendRow([d.timestamp, d.playerCode, d.playerName, d.event, d.stage, d.totalScore, d.percent, d.level, d.ecoPoints, d.hp, d.s1, d.s2, d.s3, d.s4, d.s5]);
-  return ContentService.createTextOutput(JSON.stringify({status:"ok"})).setMimeType(ContentService.MimeType.JSON);
 }`;
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(gasCode).then(() => showToast('คัดลอกโค้ด Google Apps Script แล้ว!', 'success')).catch(() => fallbackCopy(gasCode));

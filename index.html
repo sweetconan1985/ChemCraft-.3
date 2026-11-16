@@ -462,6 +462,42 @@
       }
     }
 
+    async function fetchCloudSaveByCode(code) {
+      const clean = normalizeCode(code);
+      const url = getSheetUrl().trim();
+      if (!clean || !url || !url.startsWith('https://')) return null;
+      try {
+        const res = await fetch(`${url}?code=${encodeURIComponent(clean)}`);
+        if (!res.ok) return null;
+        const d = await res.json();
+        if (!d || !d.found) return null;
+        const stageScores = { 1: d.s1 || 0, 2: d.s2 || 0, 3: d.s3 || 0, 4: d.s4 || 0, 5: d.s5 || 0 };
+        const completedStages = {};
+        const unlockedCodex = [];
+        [1, 2, 3, 4, 5].forEach((n) => {
+          if (stageScores[n] > 0) {
+            completedStages[n] = true;
+            unlockedCodex.push(n);
+          }
+        });
+        return {
+          playerCode: clean,
+          playerName: d.playerName || `ผู้เล่น ${clean}`,
+          stage: STAGE_HOME,
+          subStep: 0,
+          hp: Number(d.hp ?? 100),
+          score: Object.values(stageScores).reduce((a, b) => a + b, 0),
+          stageScores,
+          completedStages,
+          ecoPoints: Number(d.ecoPoints || 0),
+          unlockedCodex,
+          mastered: {}
+        };
+      } catch (_) {
+        return null;
+      }
+    }
+
     function getEvalResult() {
       const totalScore = Object.values(state.stageScores).reduce((a, b) => a + Number(b || 0), 0);
       const percent = Math.round((totalScore / 5000) * 100);
@@ -641,7 +677,7 @@
             ChemCraft: <span class="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-sky-400">ปฏิบัติการนักเคมีและวิศวกรวัสดุ</span>
           </h2>
           <p class="text-slate-300 max-w-xl mx-auto text-sm leading-relaxed">
-            กรอกรหัสประจำตัวเพื่อเข้าสู่ระบบและเปิดใช้งาน <strong>เซฟอัตโนมัติ (Auto-Save)</strong> เล่นค้างไว้กลับมาเล่นต่อได้ทันที
+            กรอก <strong>รหัสประจำตัวผู้เล่น</strong> เพื่อเข้าสู่ระบบ (หากเคยเล่นจากเครื่องอื่น ระบบจะดึงข้อมูลจาก Google Sheet มาให้เล่นต่ออัตโนมัติ)
           </p>
 
           <div class="max-w-md mx-auto p-4 rounded-2xl bg-[#071124]/90 border border-cyan-500/35 space-y-3 text-left">
@@ -650,7 +686,7 @@
               <input id="playerCodeInput" type="text" maxlength="20" value="${defaultCode}" placeholder="เช่น 67001 หรือ M3-05" class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-cyan-500/40 text-white focus:outline-none focus:border-cyan-300 text-sm uppercase tracking-wider" />
             </div>
             <div>
-              <label for="playerNameInput" class="block text-xs font-semibold text-cyan-300 mb-1">👤 ชื่อนักวิจัย / นักเรียน</label>
+              <label for="playerNameInput" class="block text-xs font-semibold text-cyan-300 mb-1">👤 ชื่อนักวิจัย / นักเรียน (ผู้เล่นใหม่กรอกชื่อ, ผู้เล่นเดิมใส่แค่รหัสได้เลย)</label>
               <input id="playerNameInput" type="text" maxlength="30" value="${state.playerName}" placeholder="พิมพ์ชื่อของคุณ..." class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-cyan-500/40 text-white focus:outline-none focus:border-cyan-300 text-sm" />
             </div>
 
@@ -740,7 +776,7 @@
         SoundFX.click();
         Object.assign(state, {
           playerCode: clean,
-          playerName: nameInput.value.trim() || 'นักวิจัย ม.3',
+          playerName: nameInput.value.trim() || `ผู้เล่น ${clean}`,
           stage: STAGE_HOME,
           subStep: 0,
           hp: 100,
@@ -760,7 +796,35 @@
         render();
       }
 
-      btnStart.addEventListener('click', startFreshWithCode);
+      btnStart.addEventListener('click', async () => {
+        const clean = normalizeCode(codeInput.value);
+        if (!clean) {
+          showToast('กรุณากรอกรหัสประจำตัวผู้เล่นก่อนเข้าเกม (เช่น 67001)', 'error');
+          codeInput.focus();
+          return;
+        }
+        const localFound = loadProgressByCode(clean);
+        if (localFound) {
+          SoundFX.click();
+          applySavedData(localFound);
+          render();
+          return;
+        }
+        btnStart.disabled = true;
+        btnStart.textContent = '⏳ กำลังตรวจสอบรหัสจากคลาวด์...';
+        const cloudFound = await fetchCloudSaveByCode(clean);
+        btnStart.disabled = false;
+        btnStart.textContent = '🚀 เข้าสู่เกมและเริ่มเซฟอัตโนมัติ';
+        if (cloudFound) {
+          SoundFX.correct();
+          applySavedData(cloudFound);
+          saveProgress();
+          showToast(`ยินดีต้อนรับกลับ ${state.playerName}! ดึงข้อมูลจากเครื่องอื่นสำเร็จ`, 'success');
+          render();
+          return;
+        }
+        startFreshWithCode();
+      });
       document.getElementById('btnResetSave').addEventListener('click', startFreshWithCode);
 
       document.getElementById('btnContinueSave').addEventListener('click', () => {
@@ -2446,6 +2510,32 @@
   } finally {
     lock.releaseLock();
   }
+}
+
+function doGet(e) {
+  var code = String((e && e.parameter && e.parameter.code) || "").trim().toUpperCase();
+  if (!code) return ContentService.createTextOutput(JSON.stringify({found:false})).setMimeType(ContentService.MimeType.JSON);
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
+  var values = sheet.getDataRange().getValues();
+  for (var i = 1; i < values.length; i++) {
+    if (String(values[i][1] || "").trim().toUpperCase() === code) {
+      var r = values[i];
+      return ContentService.createTextOutput(JSON.stringify({
+        found: true,
+        playerCode: code,
+        playerName: r[2],
+        totalScore: Number(r[5] || 0),
+        ecoPoints: Number(r[8] || 0),
+        hp: Number(r[9] || 100),
+        s1: Number(r[10] || 0),
+        s2: Number(r[11] || 0),
+        s3: Number(r[12] || 0),
+        s4: Number(r[13] || 0),
+        s5: Number(r[14] || 0)
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+  return ContentService.createTextOutput(JSON.stringify({found:false})).setMimeType(ContentService.MimeType.JSON);
 }`;
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(gasCode).then(() => showToast('คัดลอกโค้ด Google Apps Script แล้ว!', 'success')).catch(() => fallbackCopy(gasCode));

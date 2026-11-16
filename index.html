@@ -320,7 +320,9 @@
 
     const state = {
       playerCode: '',
+      playerPass: '',
       playerName: 'นักวิจัย ม.3',
+      playerClass: 'ม.3',
       stage: 0, // 0=start, 1..5=stages, 6=victory
       subStep: 0,
       hp: 100,
@@ -365,7 +367,9 @@
       try {
         const payload = {
           playerCode: state.playerCode,
+          playerPass: state.playerPass,
           playerName: state.playerName,
+          playerClass: state.playerClass,
           stage: state.stage,
           subStep: state.subStep,
           hp: state.hp,
@@ -403,7 +407,9 @@
     function applySavedData(data) {
       Object.assign(state, {
         playerCode: data.playerCode || '',
+        playerPass: data.playerPass || '',
         playerName: data.playerName || 'นักวิจัย ม.3',
+        playerClass: data.playerClass || 'ม.3',
         stage: Number(data.stage || 1),
         subStep: Number(data.subStep || 0),
         hp: Number(data.hp ?? 100),
@@ -424,7 +430,9 @@
     function exportSaveToken() {
       const data = {
         playerCode: state.playerCode || 'GUEST',
+        playerPass: state.playerPass || '',
         playerName: state.playerName,
+        playerClass: state.playerClass || 'ม.3',
         stage: state.stage,
         subStep: state.subStep,
         hp: state.hp,
@@ -462,15 +470,16 @@
       }
     }
 
-    async function fetchCloudSaveByCode(code) {
+    async function fetchCloudSaveByCode(code, pass = '') {
       const clean = normalizeCode(code);
       const url = getSheetUrl().trim();
-      if (!clean || !url || !url.startsWith('https://')) return null;
+      if (!clean || !url || !url.startsWith('https://')) return { status: 'no_url' };
       try {
-        const res = await fetch(`${url}?code=${encodeURIComponent(clean)}`);
-        if (!res.ok) return null;
+        const res = await fetch(`${url}?code=${encodeURIComponent(clean)}&pass=${encodeURIComponent(pass)}`);
+        if (!res.ok) return { status: 'error' };
         const d = await res.json();
-        if (!d || !d.found) return null;
+        if (!d || !d.found) return { status: 'not_found' };
+        if (d.authOk === false) return { status: 'wrong_pass' };
         const stageScores = { 1: d.s1 || 0, 2: d.s2 || 0, 3: d.s3 || 0, 4: d.s4 || 0, 5: d.s5 || 0 };
         const completedStages = {};
         const unlockedCodex = [];
@@ -481,20 +490,25 @@
           }
         });
         return {
-          playerCode: clean,
-          playerName: d.playerName || `ผู้เล่น ${clean}`,
-          stage: STAGE_HOME,
-          subStep: 0,
-          hp: Number(d.hp ?? 100),
-          score: Object.values(stageScores).reduce((a, b) => a + b, 0),
-          stageScores,
-          completedStages,
-          ecoPoints: Number(d.ecoPoints || 0),
-          unlockedCodex,
-          mastered: {}
+          status: 'ok',
+          data: {
+            playerCode: clean,
+            playerPass: pass,
+            playerName: d.playerName || `ผู้เล่น ${clean}`,
+            playerClass: d.playerClass || 'ม.3',
+            stage: STAGE_HOME,
+            subStep: 0,
+            hp: Number(d.hp ?? 100),
+            score: Object.values(stageScores).reduce((a, b) => a + b, 0),
+            stageScores,
+            completedStages,
+            ecoPoints: Number(d.ecoPoints || 0),
+            unlockedCodex,
+            mastered: {}
+          }
         };
       } catch (_) {
-        return null;
+        return { status: 'error' };
       }
     }
 
@@ -519,7 +533,9 @@
       const payload = {
         timestamp: new Date().toLocaleString('th-TH-u-nu-latn'),
         playerCode: state.playerCode || 'GUEST',
+        playerPass: state.playerPass || '',
         playerName: state.playerName,
+        playerClass: state.playerClass || 'ม.3',
         event: eventLabel,
         stage: state.stage,
         totalScore: ev.totalScore,
@@ -677,38 +693,63 @@
             ChemCraft: <span class="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-sky-400">ปฏิบัติการนักเคมีและวิศวกรวัสดุ</span>
           </h2>
           <p class="text-slate-300 max-w-xl mx-auto text-sm leading-relaxed">
-            กรอก <strong>รหัสประจำตัวผู้เล่น</strong> เพื่อเข้าสู่ระบบ (หากเคยเล่นจากเครื่องอื่น ระบบจะดึงข้อมูลจาก Google Sheet มาให้เล่นต่ออัตโนมัติ)
+            สมัครครั้งแรกเพื่อบันทึกชื่อ-นามสกุลและระดับชั้นสำหรับออกเกียรติบัตร ครั้งต่อไปล็อกอินด้วย <strong>รหัสนักเรียนและรหัสผ่าน</strong> เท่านั้น
           </p>
 
-          <div class="max-w-md mx-auto p-4 rounded-2xl bg-[#071124]/90 border border-cyan-500/35 space-y-3 text-left">
-            <div>
-              <label for="playerCodeInput" class="block text-xs font-semibold text-cyan-300 mb-1">🔑 รหัสนักเรียน / รหัสผู้เล่น (ภาษาอังกฤษหรือตัวเลข)</label>
-              <input id="playerCodeInput" type="text" maxlength="20" value="${defaultCode}" placeholder="เช่น 67001 หรือ M3-05" class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-cyan-500/40 text-white focus:outline-none focus:border-cyan-300 text-sm uppercase tracking-wider" />
-            </div>
-            <div>
-              <label for="playerNameInput" class="block text-xs font-semibold text-cyan-300 mb-1">👤 ชื่อนักวิจัย / นักเรียน (ผู้เล่นใหม่กรอกชื่อ, ผู้เล่นเดิมใส่แค่รหัสได้เลย)</label>
-              <input id="playerNameInput" type="text" maxlength="30" value="${state.playerName}" placeholder="พิมพ์ชื่อของคุณ..." class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-cyan-500/40 text-white focus:outline-none focus:border-cyan-300 text-sm" />
-            </div>
-
-            <div id="savedProfileBox" class="hidden p-3 rounded-xl bg-emerald-500/10 border border-emerald-400/40 space-y-2.5">
-              <div class="flex items-center justify-between text-xs">
-                <span class="font-bold text-emerald-300">💾 พบข้อมูลเซฟอัตโนมัติ!</span>
-                <span id="savedTimeText" class="text-slate-400"></span>
-              </div>
-              <div id="savedInfoText" class="text-xs text-slate-200"></div>
-              <div class="grid grid-cols-2 gap-2">
-                <button id="btnContinueSave" type="button" class="px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs transition">
-                  ▶️ เล่นต่อจากที่เซฟ
-                </button>
-                <button id="btnResetSave" type="button" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 font-semibold text-xs transition">
-                  🔄 เริ่มใหม่รหัสนี้
-                </button>
-              </div>
+          <div class="max-w-md mx-auto p-4 rounded-2xl bg-[#071124]/90 border border-cyan-500/35 space-y-4 text-left">
+            <!-- Tabs: Login vs Register -->
+            <div class="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-900/90 border border-slate-700/70">
+              <button id="tabLoginBtn" type="button" class="py-2 rounded-lg text-xs sm:text-sm font-extrabold bg-cyan-500 text-slate-950 transition">
+                🔑 เข้าสู่ระบบ
+              </button>
+              <button id="tabRegBtn" type="button" class="py-2 rounded-lg text-xs sm:text-sm font-bold text-slate-300 hover:text-white transition">
+                📝 สมัครเข้าเล่นครั้งแรก
+              </button>
             </div>
 
-            <button id="btnStartGame" type="button" class="w-full px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-400 to-sky-500 hover:from-cyan-300 hover:to-sky-400 text-slate-950 font-extrabold text-sm transition pulse-ring">
-              🚀 เข้าสู่เกมและเริ่มเซฟอัตโนมัติ
-            </button>
+            <!-- Panel 1: Login -->
+            <div id="panelLogin" class="space-y-3">
+              <div>
+                <label for="loginCodeInput" class="block text-xs font-semibold text-cyan-300 mb-1">รหัสนักเรียน</label>
+                <input id="loginCodeInput" type="text" maxlength="20" value="${defaultCode}" placeholder="เช่น 67001" class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-cyan-500/40 text-white focus:outline-none focus:border-cyan-300 text-sm uppercase tracking-wider" />
+              </div>
+              <div>
+                <label for="loginPassInput" class="block text-xs font-semibold text-cyan-300 mb-1">รหัสผ่าน (ตัวเลขเท่านั้น)</label>
+                <input id="loginPassInput" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="20" placeholder="กรอกรหัสผ่านตัวเลข..." class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-cyan-500/40 text-white focus:outline-none focus:border-cyan-300 text-sm tracking-widest" />
+              </div>
+              <button id="btnLoginSubmit" type="button" class="w-full px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-400 to-sky-500 hover:from-cyan-300 hover:to-sky-400 text-slate-950 font-extrabold text-sm transition pulse-ring">
+                🚀 เข้าสู่ระบบและเล่นเกม
+              </button>
+            </div>
+
+            <!-- Panel 2: Register (First time only) -->
+            <div id="panelRegister" class="hidden space-y-3">
+              <div>
+                <label for="regCodeInput" class="block text-xs font-semibold text-cyan-300 mb-1">รหัสนักเรียน</label>
+                <input id="regCodeInput" type="text" maxlength="20" placeholder="เช่น 67001" class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-cyan-500/40 text-white focus:outline-none focus:border-cyan-300 text-sm uppercase" />
+              </div>
+              <div class="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label for="regPassInput" class="block text-xs font-semibold text-cyan-300 mb-1">ตั้งรหัสผ่าน (ตัวเลข)</label>
+                  <input id="regPassInput" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="20" placeholder="ตัวเลขเท่านั้น" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-cyan-500/40 text-white focus:outline-none focus:border-cyan-300 text-sm tracking-widest" />
+                </div>
+                <div>
+                  <label for="regPassConfirmInput" class="block text-xs font-semibold text-cyan-300 mb-1">ยืนยันรหัสผ่าน</label>
+                  <input id="regPassConfirmInput" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="20" placeholder="พิมพ์รหัสผ่านอีกครั้ง" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-cyan-500/40 text-white focus:outline-none focus:border-cyan-300 text-sm tracking-widest" />
+                </div>
+              </div>
+              <div>
+                <label for="regNameInput" class="block text-xs font-semibold text-cyan-300 mb-1">ชื่อ - นามสกุล (ใช้แสดงบนเกียรติบัตร)</label>
+                <input id="regNameInput" type="text" maxlength="50" placeholder="เช่น เด็กหญิงใจดี เรียนเก่ง" class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-cyan-500/40 text-white focus:outline-none focus:border-cyan-300 text-sm" />
+              </div>
+              <div>
+                <label for="regClassInput" class="block text-xs font-semibold text-cyan-300 mb-1">ระดับชั้น / ห้อง</label>
+                <input id="regClassInput" type="text" maxlength="20" placeholder="เช่น ม.3/1" class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-cyan-500/40 text-white focus:outline-none focus:border-cyan-300 text-sm" />
+              </div>
+              <button id="btnRegisterSubmit" type="button" class="w-full px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-300 hover:to-teal-400 text-slate-950 font-extrabold text-sm transition">
+                ✨ สมัครสมาชิกและเริ่มเล่น
+              </button>
+            </div>
           </div>
 
           <div class="max-w-md mx-auto text-left space-y-2">
@@ -727,56 +768,132 @@
               </button>
             </div>
           </div>
-
-          <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs text-slate-300 max-w-2xl mx-auto">
-            <div class="p-2 rounded-xl bg-slate-900/70 border border-slate-700/70">⚛️ ด่าน 1<br><span class="text-cyan-300 font-semibold">10 ข้อ</span></div>
-            <div class="p-2 rounded-xl bg-slate-900/70 border border-slate-700/70">🌡️ ด่าน 2<br><span class="text-cyan-300 font-semibold">10 ข้อ</span></div>
-            <div class="p-2 rounded-xl bg-slate-900/70 border border-slate-700/70">🧪 ด่าน 3<br><span class="text-cyan-300 font-semibold">10 ข้อ</span></div>
-            <div class="p-2 rounded-xl bg-slate-900/70 border border-slate-700/70">🧱 ด่าน 4<br><span class="text-cyan-300 font-semibold">10 ข้อ</span></div>
-            <div class="p-2 rounded-xl bg-slate-900/70 border border-slate-700/70 col-span-2 sm:col-span-1">🏙️ ด่าน 5<br><span class="text-cyan-300 font-semibold">10 ข้อ</span></div>
-          </div>
         </div>
       `;
 
-      const codeInput = document.getElementById('playerCodeInput');
-      const nameInput = document.getElementById('playerNameInput');
-      const savedBox = document.getElementById('savedProfileBox');
-      const savedInfo = document.getElementById('savedInfoText');
-      const savedTime = document.getElementById('savedTimeText');
-      const btnStart = document.getElementById('btnStartGame');
+      const tabLogin = document.getElementById('tabLoginBtn');
+      const tabReg = document.getElementById('tabRegBtn');
+      const panelLogin = document.getElementById('panelLogin');
+      const panelReg = document.getElementById('panelRegister');
 
-      function refreshSavePreview() {
-        const clean = normalizeCode(codeInput.value);
-        const found = loadProgressByCode(clean);
-        if (found) {
-          savedBox.classList.remove('hidden');
-          btnStart.classList.add('hidden');
-          const doneCount = Object.keys(found.completedStages || {}).length;
-          const stageLabel = found.stage === STAGE_HOME ? `หน้าโฮมเลือกด่าน (ผ่าน ${doneCount}/5 ด่าน)` : (found.stage === 6 ? 'จบครบ 5 ด่านแล้ว' : `ด่านที่ ${found.stage}/5 • ข้อที่ ${found.subStep + 1}/10`);
-          savedInfo.textContent = `ผู้เล่น: ${found.playerName} | ${stageLabel} | คะแนน ${found.score} | HP ${found.hp}`;
-          savedTime.textContent = found.updatedAt ? `บันทึกล่าสุด ${found.updatedAt}` : '';
-          if (found.playerName && !nameInput.dataset.edited) nameInput.value = found.playerName;
-        } else {
-          savedBox.classList.add('hidden');
-          btnStart.classList.remove('hidden');
+      tabLogin.addEventListener('click', () => {
+        SoundFX.click();
+        tabLogin.className = 'py-2 rounded-lg text-xs sm:text-sm font-extrabold bg-cyan-500 text-slate-950 transition';
+        tabReg.className = 'py-2 rounded-lg text-xs sm:text-sm font-bold text-slate-300 hover:text-white transition';
+        panelLogin.classList.remove('hidden');
+        panelReg.classList.add('hidden');
+      });
+
+      tabReg.addEventListener('click', () => {
+        SoundFX.click();
+        tabReg.className = 'py-2 rounded-lg text-xs sm:text-sm font-extrabold bg-emerald-400 text-slate-950 transition';
+        tabLogin.className = 'py-2 rounded-lg text-xs sm:text-sm font-bold text-slate-300 hover:text-white transition';
+        panelReg.classList.remove('hidden');
+        panelLogin.classList.add('hidden');
+      });
+
+      ['loginPassInput', 'regPassInput', 'regPassConfirmInput'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.addEventListener('input', () => {
+            el.value = el.value.replace(/\D/g, '');
+          });
         }
-      }
+      });
 
-      codeInput.addEventListener('input', refreshSavePreview);
-      nameInput.addEventListener('input', () => { nameInput.dataset.edited = '1'; });
-      refreshSavePreview();
-
-      function startFreshWithCode() {
-        const clean = normalizeCode(codeInput.value);
-        if (!clean) {
-          showToast('กรุณากรอกรหัสประจำตัวผู้เล่นก่อนเข้าเกม (เช่น 67001)', 'error');
-          codeInput.focus();
+      document.getElementById('btnLoginSubmit').addEventListener('click', async () => {
+        const clean = normalizeCode(document.getElementById('loginCodeInput').value);
+        const pass = document.getElementById('loginPassInput').value.trim();
+        if (!clean || !pass) {
+          showToast('กรุณากรอกรหัสนักเรียนและรหัสผ่านให้ครบ', 'error');
           return;
         }
-        SoundFX.click();
+        if (!/^\d+$/.test(pass)) {
+          SoundFX.wrong();
+          showToast('รหัสผ่านต้องเป็นตัวเลข (0-9) เท่านั้น', 'error');
+          return;
+        }
+        const localFound = loadProgressByCode(clean);
+        if (localFound) {
+          if (String(localFound.playerPass || '') !== pass) {
+            SoundFX.wrong();
+            showToast('รหัสผ่านไม่ถูกต้อง ไม่สามารถเข้าเล่นเกมได้', 'error');
+            return;
+          }
+          SoundFX.correct();
+          applySavedData(localFound);
+          state.playerPass = pass;
+          if (state.stage === 0) state.stage = STAGE_HOME;
+          showToast(`ยินดีต้อนรับกลับ ${state.playerName}!`, 'success');
+          render();
+          return;
+        }
+
+        const btn = document.getElementById('btnLoginSubmit');
+        btn.disabled = true;
+        btn.textContent = '⏳ กำลังตรวจสอบบัญชี...';
+        const cloud = await fetchCloudSaveByCode(clean, pass);
+        btn.disabled = false;
+        btn.textContent = '🚀 เข้าสู่ระบบและเล่นเกม';
+
+        if (cloud.status === 'ok') {
+          SoundFX.correct();
+          applySavedData(cloud.data);
+          saveProgress();
+          showToast(`เข้าสู่ระบบสำเร็จ! ยินดีต้อนรับ ${state.playerName}`, 'success');
+          render();
+        } else if (cloud.status === 'wrong_pass') {
+          SoundFX.wrong();
+          showToast('รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่', 'error');
+        } else {
+          SoundFX.wrong();
+          showToast('ไม่พบรหัสนักเรียนนี้ กรุณากดแท็บ "สมัครเข้าเล่นครั้งแรก" ก่อน', 'error');
+        }
+      });
+
+      document.getElementById('btnRegisterSubmit').addEventListener('click', async () => {
+        const clean = normalizeCode(document.getElementById('regCodeInput').value);
+        const pass = document.getElementById('regPassInput').value.trim();
+        const passConfirm = document.getElementById('regPassConfirmInput').value.trim();
+        const fullName = document.getElementById('regNameInput').value.trim();
+        const classRoom = document.getElementById('regClassInput').value.trim();
+        if (!clean || !pass || !passConfirm || !fullName || !classRoom) {
+          showToast('กรุณากรอกข้อมูลให้ครบทุกช่องเพื่อใช้แสดงบนเกียรติบัตร', 'error');
+          return;
+        }
+        if (!/^\d+$/.test(pass)) {
+          SoundFX.wrong();
+          showToast('รหัสผ่านต้องตั้งเป็นตัวเลข (0-9) เท่านั้น', 'error');
+          return;
+        }
+        if (pass !== passConfirm) {
+          SoundFX.wrong();
+          showToast('รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน กรุณาตรวจสอบอีกครั้ง', 'error');
+          return;
+        }
+        if (loadProgressByCode(clean)) {
+          SoundFX.wrong();
+          showToast('รหัสนักเรียนนี้สมัครไว้แล้ว กรุณากดแท็บ "เข้าสู่ระบบ"', 'error');
+          return;
+        }
+        const btn = document.getElementById('btnRegisterSubmit');
+        btn.disabled = true;
+        btn.textContent = '⏳ กำลังสมัครสมาชิก...';
+        const cloudCheck = await fetchCloudSaveByCode(clean, pass);
+        btn.disabled = false;
+        btn.textContent = '✨ สมัครสมาชิกและเริ่มเล่น';
+        if (cloudCheck.status === 'ok' || cloudCheck.status === 'wrong_pass') {
+          SoundFX.wrong();
+          showToast('รหัสนักเรียนนี้มีในระบบแล้ว กรุณากดแท็บ "เข้าสู่ระบบ"', 'error');
+          return;
+        }
+
+        SoundFX.stageClear();
         Object.assign(state, {
           playerCode: clean,
-          playerName: nameInput.value.trim() || `ผู้เล่น ${clean}`,
+          playerPass: pass,
+          playerName: fullName,
+          playerClass: classRoom,
           stage: STAGE_HOME,
           subStep: 0,
           hp: 100,
@@ -793,48 +910,8 @@
           stage4Tested: { polymer: false, ceramic: false, metal: false }
         });
         saveProgress();
-        render();
-      }
-
-      btnStart.addEventListener('click', async () => {
-        const clean = normalizeCode(codeInput.value);
-        if (!clean) {
-          showToast('กรุณากรอกรหัสประจำตัวผู้เล่นก่อนเข้าเกม (เช่น 67001)', 'error');
-          codeInput.focus();
-          return;
-        }
-        const localFound = loadProgressByCode(clean);
-        if (localFound) {
-          SoundFX.click();
-          applySavedData(localFound);
-          render();
-          return;
-        }
-        btnStart.disabled = true;
-        btnStart.textContent = '⏳ กำลังตรวจสอบรหัสจากคลาวด์...';
-        const cloudFound = await fetchCloudSaveByCode(clean);
-        btnStart.disabled = false;
-        btnStart.textContent = '🚀 เข้าสู่เกมและเริ่มเซฟอัตโนมัติ';
-        if (cloudFound) {
-          SoundFX.correct();
-          applySavedData(cloudFound);
-          saveProgress();
-          showToast(`ยินดีต้อนรับกลับ ${state.playerName}! ดึงข้อมูลจากเครื่องอื่นสำเร็จ`, 'success');
-          render();
-          return;
-        }
-        startFreshWithCode();
-      });
-      document.getElementById('btnResetSave').addEventListener('click', startFreshWithCode);
-
-      document.getElementById('btnContinueSave').addEventListener('click', () => {
-        const clean = normalizeCode(codeInput.value);
-        const found = loadProgressByCode(clean);
-        if (!found) return;
-        SoundFX.click();
-        applySavedData(found);
-        if (nameInput.value.trim()) state.playerName = nameInput.value.trim();
-        showToast(`ยินดีต้อนรับกลับ ${state.playerName}!`, 'success');
+        sendToGoogleSheet('สมัครเข้าเล่นเกมใหม่', false);
+        showToast(`สมัครสำเร็จ! ยินดีต้อนรับ ${fullName}`, 'success');
         render();
       });
 
@@ -2023,7 +2100,7 @@
           <div class="flex flex-wrap items-center justify-between gap-2 border-b border-cyan-500/20 pb-3">
             <div>
               <h2 class="text-xl sm:text-2xl font-extrabold text-cyan-300">🏠 หน้าโฮมเลือกด่าน (Mission Hub)</h2>
-              <p class="text-xs sm:text-sm text-slate-300">ผู้เล่น: <strong class="text-white">${state.playerName}</strong> (${state.playerCode || 'GUEST'}) • ผ่านแล้ว <strong>${doneCount}/5</strong> ด่าน</p>
+              <p class="text-xs sm:text-sm text-slate-300">ผู้เล่น: <strong class="text-white">${state.playerName}</strong> (${state.playerClass || 'ม.3'} • รหัส ${state.playerCode || 'GUEST'}) • ผ่านแล้ว <strong>${doneCount}/5</strong> ด่าน</p>
             </div>
             <div class="text-right">
               <div class="text-xs text-slate-400">คะแนนรวมปัจจุบัน</div>
@@ -2112,7 +2189,7 @@
         <div style="width: 100%; max-width: 960px; aspect-ratio: 297 / 210; background: #ffffff; border: 8px double #1e3a8a; box-shadow: inset 0 0 0 3px #2563eb, 0 12px 32px rgba(0,0,0,0.25); padding: 28px 40px; display: flex; flex-direction: column; justify-content: space-between; text-align: center; color: #1e3a8a; font-family: 'Angsana New', 'AngsanaUPC', 'Sarabun', 'Noto Sans Thai', sans-serif; position: relative; overflow: hidden;">
           <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #93c5fd; padding-bottom: 8px;">
             <span style="font-size: 18px; color: #1e40af; font-weight: 700;">⚗️ CHEMCRAFT M.3 • หลักสูตร สสวท.</span>
-            <span style="font-size: 18px; color: #1e3a8a; font-weight: 700;">รหัสผู้เรียน: ${state.playerCode || 'GUEST'}</span>
+            <span style="font-size: 18px; color: #1e3a8a; font-weight: 700;">รหัสนักเรียน: ${state.playerCode || 'GUEST'} | ระดับชั้น: ${state.playerClass || 'ม.3'}</span>
           </div>
 
           <div style="margin: 6px 0;">
@@ -2173,7 +2250,7 @@
               ${ev.passed ? 'ยินดีด้วย! ผ่านเกณฑ์การประเมินครบ 5 ด่าน' : 'คะแนนยังไม่ถึงเกณฑ์ 60%'}
             </h2>
             <p class="text-sm text-slate-300">
-              ผู้เล่น: <strong class="text-white">${state.playerName}</strong> (${state.playerCode || 'GUEST'}) |
+              ผู้เล่น: <strong class="text-white">${state.playerName}</strong> (${state.playerClass || 'ม.3'} • รหัส ${state.playerCode || 'GUEST'}) |
               <span class="inline-block px-2.5 py-0.5 rounded-full border text-xs font-extrabold ${ev.badgeColor}">
                 ระดับ: ${ev.level} (${ev.percent}%)
               </span>
@@ -2448,9 +2525,11 @@
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheets()[0];
     if (sheet.getLastRow() === 0) {
-      sheet.appendRow(["Timestamp","PlayerCode","PlayerName","Event","Stage","TotalScore","Percent","Level","EcoPoints","HP","S1","S2","S3","S4","S5","CertStatus","CertDate","TeacherName","CertSummary","CertPDF"]);
-    } else if (!sheet.getRange(1, 20).getValue()) {
-      sheet.getRange(1, 20).setValue("CertPDF");
+      sheet.appendRow(["Timestamp","PlayerCode","PlayerName","Event","Stage","TotalScore","Percent","Level","EcoPoints","HP","S1","S2","S3","S4","S5","CertStatus","CertDate","TeacherName","CertSummary","CertPDF","Password","ClassRoom"]);
+    } else {
+      if (!sheet.getRange(1, 20).getValue()) sheet.getRange(1, 20).setValue("CertPDF");
+      if (!sheet.getRange(1, 21).getValue()) sheet.getRange(1, 21).setValue("Password");
+      if (!sheet.getRange(1, 22).getValue()) sheet.getRange(1, 22).setValue("ClassRoom");
     }
     var d = JSON.parse(e.postData.contents);
     var code = String(d.playerCode || "").trim().toUpperCase();
@@ -2467,7 +2546,7 @@
       pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
       pdfLinkFormula = '=HYPERLINK("' + pdfFile.getUrl() + '", "📄 เปิดเกียรติบัตร PDF")';
     }
-    var rowData = [d.timestamp, code, d.playerName, d.event, d.stage, d.totalScore, d.percent, d.level, d.ecoPoints, d.hp, d.s1, d.s2, d.s3, d.s4, d.s5, d.certStatus || "", d.certDate || "", d.teacherName || "", d.certSummary || "", pdfLinkFormula];
+    var rowData = [d.timestamp, code, d.playerName, d.event, d.stage, d.totalScore, d.percent, d.level, d.ecoPoints, d.hp, d.s1, d.s2, d.s3, d.s4, d.s5, d.certStatus || "", d.certDate || "", d.teacherName || "", d.certSummary || "", pdfLinkFormula, String(d.playerPass || ""), String(d.playerClass || "")];
     var values = sheet.getDataRange().getValues();
     var foundRow = -1;
     for (var i = 1; i < values.length; i++) {
@@ -2514,16 +2593,23 @@
 
 function doGet(e) {
   var code = String((e && e.parameter && e.parameter.code) || "").trim().toUpperCase();
+  var pass = String((e && e.parameter && e.parameter.pass) || "").trim();
   if (!code) return ContentService.createTextOutput(JSON.stringify({found:false})).setMimeType(ContentService.MimeType.JSON);
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
   var values = sheet.getDataRange().getValues();
   for (var i = 1; i < values.length; i++) {
     if (String(values[i][1] || "").trim().toUpperCase() === code) {
       var r = values[i];
+      var savedPass = String(r[20] || "").trim();
+      if (savedPass && savedPass !== pass) {
+        return ContentService.createTextOutput(JSON.stringify({found:true, authOk:false})).setMimeType(ContentService.MimeType.JSON);
+      }
       return ContentService.createTextOutput(JSON.stringify({
         found: true,
+        authOk: true,
         playerCode: code,
         playerName: r[2],
+        playerClass: r[21] || "ม.3",
         totalScore: Number(r[5] || 0),
         ecoPoints: Number(r[8] || 0),
         hp: Number(r[9] || 100),

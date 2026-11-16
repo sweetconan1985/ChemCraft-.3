@@ -378,7 +378,7 @@
           bossHp: state.bossHp,
           stage2Temp: state.stage2Temp,
           stage4Tested: state.stage4Tested,
-          updatedAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
+          updatedAt: new Date().toLocaleTimeString('th-TH-u-nu-latn', { hour: '2-digit', minute: '2-digit' })
         };
         localStorage.setItem(SAVE_PREFIX + state.playerCode, JSON.stringify(payload));
         localStorage.setItem(LAST_CODE_KEY, state.playerCode);
@@ -476,7 +476,7 @@
       if (!url || !url.startsWith('https://')) return false;
       const ev = getEvalResult();
       const payload = {
-        timestamp: new Date().toLocaleString('th-TH'),
+        timestamp: new Date().toLocaleString('th-TH-u-nu-latn'),
         playerCode: state.playerCode || 'GUEST',
         playerName: state.playerName,
         event: eventLabel,
@@ -492,7 +492,7 @@
         s4: state.stageScores[4] || 0,
         s5: state.stageScores[5] || 0,
         certStatus: ev.passed ? 'ผ่านเกณฑ์ (รับเกียรติบัตร)' : 'ยังไม่ผ่านเกณฑ์',
-        certDate: new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }),
+        certDate: new Date().toLocaleDateString('th-TH-u-nu-latn', { year: 'numeric', month: 'long', day: 'numeric' }),
         teacherName: getTeacherName(),
         certSummary: ev.passed ? `มอบเกียรติบัตรแก่ ${state.playerName} (${state.playerCode || 'GUEST'}) ระดับ ${ev.level} (${ev.percent}%)` : '-'
       };
@@ -2036,7 +2036,7 @@
 
     // --- STAGE 6: Victory, Evaluation Criteria & A4 Landscape Certificate ---
     function buildCertificateHTML(ev) {
-      const todayTh = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+      const todayTh = new Date().toLocaleDateString('th-TH-u-nu-latn', { year: 'numeric', month: 'long', day: 'numeric' });
       return `
         <div style="width: 100%; max-width: 960px; aspect-ratio: 297 / 210; background: #ffffff; border: 8px double #1e3a8a; box-shadow: inset 0 0 0 3px #2563eb, 0 12px 32px rgba(0,0,0,0.25); padding: 28px 40px; display: flex; flex-direction: column; justify-content: space-between; text-align: center; color: #1e3a8a; font-family: 'TH SarabunPSK', 'Sarabun', 'Noto Sans Thai', sans-serif; position: relative; overflow: hidden;">
           <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #93c5fd; padding-bottom: 8px;">

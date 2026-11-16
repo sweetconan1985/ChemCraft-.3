@@ -129,6 +129,10 @@
           💾 เซฟแล้ว
         </span>
 
+        <button id="btnHome" type="button" title="กลับหน้าโฮมเลือกด่าน" class="hidden px-2.5 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/40 text-cyan-200 text-xs font-semibold transition">
+          🏠 หน้าโฮม
+        </button>
+
         <button id="btnSwitchAccount" type="button" title="สลับรหัสผู้เล่น" class="hidden px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-xs font-semibold transition">
           🔑 สลับรหัส
         </button>
@@ -302,6 +306,7 @@
     const SAVE_PREFIX = 'chemcraft_m3_save_';
     const LAST_CODE_KEY = 'chemcraft_m3_last_code';
     const SHEET_URL_KEY = 'chemcraft_m3_sheet_url';
+    const STAGE_HOME = 10;
     const DEFAULT_SHEET_URL = 'https://script.google.com/macros/s/AKfycbwZ6-hwkqngcgE6QF5jJ9Zr0zwJNaXnkQZa8hK-ovzA7L3uTm0Exg_RPUQFowfPjXHO/exec'; // ครูสามารถใส่ URL ของ Apps Script ตรงนี้ถาวรก่อนอัปขึ้น GitHub Pages ได้เลย
 
     const state = {
@@ -312,6 +317,7 @@
       hp: 100,
       score: 0,
       stageScores: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+      completedStages: {},
       wrongInCurrentQ: 0,
       replayMode: false,
       ecoPoints: 0,
@@ -337,7 +343,8 @@
       toast: document.getElementById('toastBox'),
       btnMute: document.getElementById('btnMute'),
       hudSaveStatus: document.getElementById('hudSaveStatus'),
-      btnSwitchAccount: document.getElementById('btnSwitchAccount')
+      btnSwitchAccount: document.getElementById('btnSwitchAccount'),
+      btnHome: document.getElementById('btnHome')
     };
 
     function normalizeCode(raw) {
@@ -355,6 +362,7 @@
           hp: state.hp,
           score: state.score,
           stageScores: state.stageScores,
+          completedStages: state.completedStages,
           ecoPoints: state.ecoPoints,
           unlockedCodex: state.unlockedCodex,
           mastered: state.mastered,
@@ -392,6 +400,7 @@
         hp: Number(data.hp ?? 100),
         score: Number(data.score || 0),
         stageScores: data.stageScores || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+        completedStages: data.completedStages || {},
         wrongInCurrentQ: 0,
         replayMode: false,
         ecoPoints: Number(data.ecoPoints || 0),
@@ -412,6 +421,7 @@
         hp: state.hp,
         score: state.score,
         stageScores: state.stageScores,
+        completedStages: state.completedStages,
         ecoPoints: state.ecoPoints,
         unlockedCodex: state.unlockedCodex,
         mastered: state.mastered,
@@ -501,8 +511,11 @@
 
       if (state.stage >= 1) {
         dom.btnSwitchAccount.classList.remove('hidden');
+        if (state.stage !== STAGE_HOME) dom.btnHome.classList.remove('hidden');
+        else dom.btnHome.classList.add('hidden');
         if (state.playerCode) dom.hudSaveStatus.classList.remove('hidden');
       } else {
+        dom.btnHome.classList.add('hidden');
         dom.btnSwitchAccount.classList.add('hidden');
         dom.hudSaveStatus.classList.add('hidden');
       }
@@ -550,11 +563,6 @@
         onSuccess();
         if (state.stage !== prevStage) {
           sendToGoogleSheet(`ผ่านด่านที่ ${prevStage}`);
-          if (state.replayMode && state.stage <= 5) {
-            state.replayMode = false;
-            state.stage = 6;
-            render();
-          }
         }
       } else {
         SoundFX.wrong();
@@ -678,7 +686,8 @@
         if (found) {
           savedBox.classList.remove('hidden');
           btnStart.classList.add('hidden');
-          const stageLabel = found.stage > 5 ? 'จบครบ 5 ด่านแล้ว' : `ด่านที่ ${found.stage}/5 • ข้อที่ ${found.subStep + 1}/10`;
+          const doneCount = Object.keys(found.completedStages || {}).length;
+          const stageLabel = found.stage === STAGE_HOME ? `หน้าโฮมเลือกด่าน (ผ่าน ${doneCount}/5 ด่าน)` : (found.stage === 6 ? 'จบครบ 5 ด่านแล้ว' : `ด่านที่ ${found.stage}/5 • ข้อที่ ${found.subStep + 1}/10`);
           savedInfo.textContent = `ผู้เล่น: ${found.playerName} | ${stageLabel} | คะแนน ${found.score} | HP ${found.hp}`;
           savedTime.textContent = found.updatedAt ? `บันทึกล่าสุด ${found.updatedAt}` : '';
           if (found.playerName && !nameInput.dataset.edited) nameInput.value = found.playerName;
@@ -703,11 +712,12 @@
         Object.assign(state, {
           playerCode: clean,
           playerName: nameInput.value.trim() || 'นักวิจัย ม.3',
-          stage: 1,
+          stage: STAGE_HOME,
           subStep: 0,
           hp: 100,
           score: 0,
           stageScores: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+          completedStages: {},
           wrongInCurrentQ: 0,
           replayMode: false,
           ecoPoints: 0,
@@ -989,9 +999,9 @@
               handleAnswer(true, q.feedbackOk, () => {
                 markMastered(['ว 2.1 ม.3/3', 'ว 2.1 ม.3/4']);
                 unlockCodex(1);
-                state.stage = 2;
+                state.completedStages[1] = true;
+                state.stage = STAGE_HOME;
                 state.subStep = 0;
-                state.stage2Temp = 28;
                 render();
               });
             }
@@ -1263,7 +1273,8 @@
               handleAnswer(true, q.feedbackOk, () => {
                 markMastered(['ว 2.1 ม.3/5']);
                 unlockCodex(2);
-                state.stage = 3;
+                state.completedStages[2] = true;
+                state.stage = STAGE_HOME;
                 state.subStep = 0;
                 setTimeout(render, 550);
               });
@@ -1474,7 +1485,8 @@
               handleAnswer(true, q.feedbackOk, () => {
                 markMastered(['ว 2.1 ม.3/6']);
                 unlockCodex(3);
-                state.stage = 4;
+                state.completedStages[3] = true;
+                state.stage = STAGE_HOME;
                 state.subStep = 0;
                 render();
               });
@@ -1684,9 +1696,9 @@
               handleAnswer(true, q.feedbackOk, () => {
                 markMastered(['ว 2.1 ม.3/1', 'ว 2.1 ม.3/2']);
                 unlockCodex(4);
-                state.stage = 5;
+                state.completedStages[4] = true;
+                state.stage = STAGE_HOME;
                 state.subStep = 0;
-                state.bossHp = 100;
                 render();
               }, q.ecoBonus || 0);
             }
@@ -1886,7 +1898,9 @@
               handleAnswer(true, q.feedbackOk, () => {
                 markMastered(['ว 2.1 ม.3/7', 'ว 2.1 ม.3/8']);
                 unlockCodex(5);
-                state.stage = 6;
+                state.completedStages[5] = true;
+                state.stage = STAGE_HOME;
+                state.subStep = 0;
                 render();
               }, q.ecoBonus || 0);
             }
@@ -1895,6 +1909,106 @@
           }
         });
       });
+    }
+
+    // --- HOME: Stage Select Hub ---
+    function renderHome() {
+      const ev = getEvalResult();
+      const doneCount = [1, 2, 3, 4, 5].filter((n) => state.completedStages[n]).length;
+      const allDone = doneCount === 5;
+      const stageMeta = [
+        { num: 1, icon: '⚛️', title: 'ด่านที่ 1: ห้องแล็บจัดเรียงอะตอมและกฎทรงมวล', code: 'ว 2.1 ม.3/3, ม.3/4' },
+        { num: 2, icon: '🌡️', title: 'ด่านที่ 2: เตาพลังงานความร้อน (ดูด-คายความร้อน)', code: 'ว 2.1 ม.3/5' },
+        { num: 3, icon: '🧪', title: 'ด่านที่ 3: สมรภูมิกรด-เบส โลหะ และสนิมเหล็ก', code: 'ว 2.1 ม.3/6' },
+        { num: 4, icon: '🧱', title: 'ด่านที่ 4: คลังแสงวัสดุรอบตัว (พอลิเมอร์ เซรามิก วัสดุผสม)', code: 'ว 2.1 ม.3/1, ม.3/2' },
+        { num: 5, icon: '🏙️', title: 'ด่านที่ 5: บอสไฟต์ STEM กู้เมืองจากมลพิษ', code: 'ว 2.1 ม.3/7, ม.3/8' }
+      ];
+
+      dom.container.innerHTML = `
+        <div class="space-y-5">
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-cyan-500/20 pb-3">
+            <div>
+              <h2 class="text-xl sm:text-2xl font-extrabold text-cyan-300">🏠 หน้าโฮมเลือกด่าน (Mission Hub)</h2>
+              <p class="text-xs sm:text-sm text-slate-300">ผู้เล่น: <strong class="text-white">${state.playerName}</strong> (${state.playerCode || 'GUEST'}) • ผ่านแล้ว <strong>${doneCount}/5</strong> ด่าน</p>
+            </div>
+            <div class="text-right">
+              <div class="text-xs text-slate-400">คะแนนรวมปัจจุบัน</div>
+              <div class="text-lg font-extrabold text-cyan-300">${ev.totalScore}/5,000 (${ev.percent}%)</div>
+            </div>
+          </div>
+
+          <div class="grid gap-3">
+            ${stageMeta.map((s) => {
+              const isDone = Boolean(state.completedStages[s.num]);
+              const isUnlocked = s.num === 1 || Boolean(state.completedStages[s.num - 1]);
+              const sc = state.stageScores[s.num] || 0;
+              const borderCls = isDone ? 'border-emerald-500/45' : (isUnlocked ? 'border-cyan-500/35' : 'border-slate-700/60 opacity-65');
+              const badgeCls = isDone
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40'
+                : (isUnlocked ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-400/40' : 'bg-slate-800 text-slate-400 border border-slate-700');
+              const badgeTxt = isDone
+                ? `✅ ผ่านแล้ว (${sc}/1,000)`
+                : (isUnlocked ? '🔓 พร้อมเล่น' : `🔒 ต้องผ่านด่าน ${s.num - 1} ก่อน`);
+              const btnCls = !isUnlocked
+                ? 'bg-slate-800 border border-slate-700 text-slate-500 cursor-not-allowed'
+                : (isDone ? 'bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200' : 'bg-gradient-to-r from-cyan-400 to-sky-500 hover:from-cyan-300 hover:to-sky-400 text-slate-950 font-extrabold');
+              const btnTxt = !isUnlocked ? '🔒 ล็อกอยู่' : (isDone ? '🔄 เล่นซ้ำทำคะแนนเพิ่ม' : '▶️ เข้าเล่นด่านนี้');
+              return `
+                <div class="p-4 rounded-xl bg-[#071124] border ${borderCls} flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div class="space-y-1">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="text-lg">${s.icon}</span>
+                      <span class="font-bold text-white text-sm sm:text-base">${s.title}</span>
+                      <span class="px-2 py-0.5 rounded-full text-[11px] font-bold ${badgeCls}">
+                        ${badgeTxt}
+                      </span>
+                    </div>
+                    <div class="text-xs text-slate-400">ตัวชี้วัด ${s.code} • 10 ข้อ</div>
+                  </div>
+                  <button type="button" data-stage="${s.num}" ${isUnlocked ? '' : 'disabled'} class="btn-enter-stage shrink-0 px-4 py-2 rounded-xl ${btnCls} text-xs sm:text-sm font-bold transition">
+                    ${btnTxt}
+                  </button>
+                </div>
+              `;
+            }).join('')}
+          </div>
+
+          <div class="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-cyan-500/20">
+            <div class="text-xs text-slate-400">
+              ${allDone ? '🎉 คุณเล่นครบทั้ง 5 ด่านแล้ว กดดูผลประเมินและเกียรติบัตรได้เลย!' : 'เล่นให้ครบทั้ง 5 ด่านเพื่อปลดล็อกหน้าสรุปผลและเกียรติบัตร (เกณฑ์ผ่าน ≥ 60%)'}
+            </div>
+            <button id="btnOpenVictory" type="button" ${allDone ? '' : 'disabled'} class="w-full sm:w-auto px-6 py-3 rounded-xl font-extrabold text-sm transition ${allDone ? 'bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 cyan-glow' : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'}">
+              🏆 สรุปผลคะแนนและรับเกียรติบัตร
+            </button>
+          </div>
+        </div>
+      `;
+
+      document.querySelectorAll('.btn-enter-stage').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const sNum = Number(btn.dataset.stage);
+          if (sNum > 1 && !state.completedStages[sNum - 1]) return;
+          SoundFX.click();
+          state.stageScores[sNum] = 0;
+          state.score = Object.values(state.stageScores).reduce((a, b) => a + Number(b || 0), 0);
+          state.hp = 100;
+          state.wrongInCurrentQ = 0;
+          state.stage = sNum;
+          state.subStep = 0;
+          if (sNum === 2) state.stage2Temp = 28;
+          if (sNum === 5) state.bossHp = 100;
+          render();
+        });
+      });
+
+      const btnVic = document.getElementById('btnOpenVictory');
+      if (btnVic && allDone) {
+        btnVic.addEventListener('click', () => {
+          SoundFX.click();
+          state.stage = 6;
+          render();
+        });
+      }
     }
 
     // --- STAGE 6: Victory, Evaluation Criteria & A4 Landscape Certificate ---
@@ -2042,7 +2156,7 @@
               🔑 คัดลอกรหัสเซฟข้ามเครื่อง
             </button>
             <button id="btnPlayAgain" type="button" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-sky-500 hover:from-cyan-300 hover:to-sky-400 text-slate-950 font-extrabold text-sm transition">
-              🔄 กลับหน้าแรก
+              🏠 กลับหน้าโฮมเลือกด่าน
             </button>
           </div>
         </div>
@@ -2095,7 +2209,7 @@
 
       document.getElementById('btnPlayAgain').addEventListener('click', () => {
         SoundFX.click();
-        state.stage = 0;
+        state.stage = STAGE_HOME;
         render();
       });
     }
@@ -2125,10 +2239,18 @@
       else if (state.stage === 3) renderStage3();
       else if (state.stage === 4) renderStage4();
       else if (state.stage === 5) renderStage5();
+      else if (state.stage === STAGE_HOME) renderHome();
       else renderVictory();
     }
 
     // --- Modal, Switch Account & Mute Listeners ---
+    dom.btnHome.addEventListener('click', () => {
+      SoundFX.click();
+      saveProgress();
+      state.stage = STAGE_HOME;
+      render();
+    });
+
     dom.btnSwitchAccount.addEventListener('click', () => {
       SoundFX.click();
       saveProgress();

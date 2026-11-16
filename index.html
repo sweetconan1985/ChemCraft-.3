@@ -816,6 +816,38 @@
           return;
         }
         const localFound = loadProgressByCode(clean);
+        const btn = document.getElementById('btnLoginSubmit');
+        btn.disabled = true;
+        btn.textContent = '⏳ กำลังซิงค์ข้อมูลล่าสุด...';
+        const cloud = await fetchCloudSaveByCode(clean, pass);
+        btn.disabled = false;
+        btn.textContent = '🚀 เข้าสู่ระบบและเล่นเกม';
+
+        if (cloud.status === 'wrong_pass') {
+          SoundFX.wrong();
+          showToast('รหัสผ่านไม่ถูกต้อง ไม่สามารถเข้าเล่นเกมได้', 'error');
+          return;
+        }
+
+        if (cloud.status === 'ok') {
+          let merged = cloud.data;
+          if (localFound && String(localFound.playerPass || '') === pass) {
+            const localDone = Object.keys(localFound.completedStages || {}).length;
+            const cloudDone = Object.keys(cloud.data.completedStages || {}).length;
+            if (localDone > cloudDone || (localDone === cloudDone && (localFound.score || 0) > (cloud.data.score || 0))) {
+              merged = localFound;
+            }
+          }
+          SoundFX.correct();
+          applySavedData(merged);
+          state.playerPass = pass;
+          if (state.stage === 0) state.stage = STAGE_HOME;
+          saveProgress();
+          showToast(`เข้าสู่ระบบสำเร็จ! ซิงค์ข้อมูลล่าสุดของ ${state.playerName} แล้ว`, 'success');
+          render();
+          return;
+        }
+
         if (localFound) {
           if (String(localFound.playerPass || '') !== pass) {
             SoundFX.wrong();
@@ -831,23 +863,7 @@
           return;
         }
 
-        const btn = document.getElementById('btnLoginSubmit');
-        btn.disabled = true;
-        btn.textContent = '⏳ กำลังตรวจสอบบัญชี...';
-        const cloud = await fetchCloudSaveByCode(clean, pass);
-        btn.disabled = false;
-        btn.textContent = '🚀 เข้าสู่ระบบและเล่นเกม';
-
-        if (cloud.status === 'ok') {
-          SoundFX.correct();
-          applySavedData(cloud.data);
-          saveProgress();
-          showToast(`เข้าสู่ระบบสำเร็จ! ยินดีต้อนรับ ${state.playerName}`, 'success');
-          render();
-        } else if (cloud.status === 'wrong_pass') {
-          SoundFX.wrong();
-          showToast('รหัสผ่านไม่ถูกต้อง ไม่สามารถเข้าเล่นเกมได้', 'error');
-        } else if (cloud.status === 'error') {
+        if (cloud.status === 'error') {
           SoundFX.wrong();
           showToast('เชื่อมต่อ Google Sheet ไม่ได้ กรุณาตรวจสอบว่าได้ Deploy New version แล้ว', 'error');
         } else {

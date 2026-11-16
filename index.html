@@ -186,6 +186,10 @@
           <input id="teacherNameInput" type="text" maxlength="60" placeholder="เช่น ครูหฤทัย เพ็ชรรัตน์" class="w-full px-3.5 py-2.5 rounded-xl bg-[#071124] border border-cyan-500/40 text-white focus:outline-none focus:border-cyan-300 text-xs" />
         </div>
         <div class="space-y-1.5">
+          <label for="schoolNameInput" class="block font-semibold text-cyan-200">🏫 ชื่อโรงเรียน (แสดงใต้ชื่อนักเรียนบนเกียรติบัตร)</label>
+          <input id="schoolNameInput" type="text" maxlength="80" placeholder="เช่น โรงเรียนสุราษฎร์พิทยา" class="w-full px-3.5 py-2.5 rounded-xl bg-[#071124] border border-cyan-500/40 text-white focus:outline-none focus:border-cyan-300 text-xs" />
+        </div>
+        <div class="space-y-1.5">
           <label for="sheetUrlInput" class="block font-semibold text-cyan-200">Google Apps Script Web App URL</label>
           <input id="sheetUrlInput" type="url" placeholder="https://script.google.com/macros/s/.../exec" class="w-full px-3.5 py-2.5 rounded-xl bg-[#071124] border border-cyan-500/40 text-white focus:outline-none focus:border-cyan-300 text-xs" />
           <p class="text-[11px] text-slate-400">เมื่อตั้งค่าแล้ว ระบบจะส่งคะแนนและข้อมูลเกียรติบัตรเข้า Google Sheet อัตโนมัติ</p>
@@ -314,6 +318,8 @@
     const LAST_CODE_KEY = 'chemcraft_m3_last_code';
     const SHEET_URL_KEY = 'chemcraft_m3_sheet_url';
     const TEACHER_NAME_KEY = 'chemcraft_m3_teacher_name';
+    const SCHOOL_NAME_KEY = 'chemcraft_m3_school_name';
+    const DEFAULT_SCHOOL_NAME = '';
     const DEFAULT_TEACHER_NAME = 'ครูผู้สอนวิชาวิทยาศาสตร์ ม.3';
     const STAGE_HOME = 10;
     const DEFAULT_SHEET_URL = 'https://script.google.com/macros/s/AKfycbwZ6-hwkqngcgE6QF5jJ9Zr0zwJNaXnkQZa8hK-ovzA7L3uTm0Exg_RPUQFowfPjXHO/exec'; // ครูสามารถใส่ URL ของ Apps Script ตรงนี้ถาวรก่อนอัปขึ้น GitHub Pages ได้เลย
@@ -468,6 +474,14 @@
         return localStorage.getItem(TEACHER_NAME_KEY) || DEFAULT_TEACHER_NAME;
       } catch (_) {
         return DEFAULT_TEACHER_NAME;
+      }
+    }
+
+    function getSchoolName() {
+      try {
+        return localStorage.getItem(SCHOOL_NAME_KEY) || DEFAULT_SCHOOL_NAME;
+      } catch (_) {
+        return DEFAULT_SCHOOL_NAME;
       }
     }
 
@@ -944,6 +958,7 @@
       document.getElementById('btnOpenTeacherModal').addEventListener('click', () => {
         SoundFX.click();
         document.getElementById('teacherNameInput').value = getTeacherName();
+        document.getElementById('schoolNameInput').value = getSchoolName();
         document.getElementById('sheetUrlInput').value = getSheetUrl();
         const tm = document.getElementById('teacherModal');
         tm.classList.remove('hidden');
@@ -2217,8 +2232,11 @@
             <div style="font-size: 18px; letter-spacing: 2px; color: #2563eb; font-weight: 700; text-transform: uppercase;">CERTIFICATE OF ACHIEVEMENT</div>
             <h1 style="font-size: 44px; font-weight: 800; color: #1e3a8a; margin: 4px 0; line-height: 1.15;">เกียรติบัตรรับรองผลการเรียนรู้</h1>
             <p style="font-size: 22px; color: #1e40af; margin: 4px 0;">ขอมอบเกียรติบัตรฉบับนี้ให้ไว้เพื่อแสดงว่า</p>
-            <div style="font-size: 40px; font-weight: 800; color: #1d4ed8; margin: 6px 0; text-decoration: underline; text-decoration-color: #60a5fa; text-underline-offset: 6px;">
+            <div style="font-size: 40px; font-weight: 800; color: #1d4ed8; margin: 4px 0 2px 0;">
               ${state.playerName}
+            </div>
+            <div style="font-size: 22px; font-weight: 700; color: #1e40af; margin-bottom: 6px;">
+              ระดับชั้น ${state.playerClass || 'ม.3'}${getSchoolName() ? ' • ' + getSchoolName() : ''}
             </div>
             <p style="font-size: 21px; color: #1e3a8a; max-width: 720px; margin: 4px auto; line-height: 1.4;">
               ได้ผ่านการเรียนรู้และทดสอบทักษะเรื่อง <strong>ปฏิกิริยาเคมีและวัสดุในชีวิตประจำวัน (ม.3)</strong><br/>
@@ -2510,12 +2528,14 @@
     document.getElementById('btnSaveSheetUrl').addEventListener('click', () => {
       const val = document.getElementById('sheetUrlInput').value.trim();
       const tName = document.getElementById('teacherNameInput').value.trim() || DEFAULT_TEACHER_NAME;
+      const sName = document.getElementById('schoolNameInput').value.trim();
       if (val && !val.startsWith('https://')) {
         showToast('URL ต้องขึ้นต้นด้วย https:// เท่านั้น', 'error');
         return;
       }
       try {
         localStorage.setItem(TEACHER_NAME_KEY, tName);
+        localStorage.setItem(SCHOOL_NAME_KEY, sName);
         localStorage.setItem(SHEET_URL_KEY, val);
         SoundFX.correct();
         showToast('บันทึกชื่อครูและ URL เรียบร้อย!', 'success');

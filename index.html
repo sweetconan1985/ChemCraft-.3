@@ -433,6 +433,7 @@
         playerPass: state.playerPass || '',
         playerName: state.playerName,
         playerClass: state.playerClass || 'ม.3',
+        completedStages: Object.keys(state.completedStages).join(','),
         stage: state.stage,
         subStep: state.subStep,
         hp: state.hp,
@@ -483,8 +484,9 @@
         const stageScores = { 1: d.s1 || 0, 2: d.s2 || 0, 3: d.s3 || 0, 4: d.s4 || 0, 5: d.s5 || 0 };
         const completedStages = {};
         const unlockedCodex = [];
+        const doneList = String(d.completedStages || '').split(',').map((x) => Number(x.trim())).filter((x) => x >= 1 && x <= 5);
         [1, 2, 3, 4, 5].forEach((n) => {
-          if (stageScores[n] > 0) {
+          if (doneList.includes(n) || stageScores[n] > 0) {
             completedStages[n] = true;
             unlockedCodex.push(n);
           }
@@ -844,7 +846,10 @@
           render();
         } else if (cloud.status === 'wrong_pass') {
           SoundFX.wrong();
-          showToast('รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่', 'error');
+          showToast('รหัสผ่านไม่ถูกต้อง ไม่สามารถเข้าเล่นเกมได้', 'error');
+        } else if (cloud.status === 'error') {
+          SoundFX.wrong();
+          showToast('เชื่อมต่อ Google Sheet ไม่ได้ กรุณาตรวจสอบว่าได้ Deploy New version แล้ว', 'error');
         } else {
           SoundFX.wrong();
           showToast('ไม่พบรหัสนักเรียนนี้ กรุณากดแท็บ "สมัครเข้าเล่นครั้งแรก" ก่อน', 'error');
@@ -2525,11 +2530,12 @@
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheets()[0];
     if (sheet.getLastRow() === 0) {
-      sheet.appendRow(["Timestamp","PlayerCode","PlayerName","Event","Stage","TotalScore","Percent","Level","EcoPoints","HP","S1","S2","S3","S4","S5","CertStatus","CertDate","TeacherName","CertSummary","CertPDF","Password","ClassRoom"]);
+      sheet.appendRow(["Timestamp","PlayerCode","PlayerName","Event","Stage","TotalScore","Percent","Level","EcoPoints","HP","S1","S2","S3","S4","S5","CertStatus","CertDate","TeacherName","CertSummary","CertPDF","Password","ClassRoom","CompletedStages"]);
     } else {
       if (!sheet.getRange(1, 20).getValue()) sheet.getRange(1, 20).setValue("CertPDF");
       if (!sheet.getRange(1, 21).getValue()) sheet.getRange(1, 21).setValue("Password");
       if (!sheet.getRange(1, 22).getValue()) sheet.getRange(1, 22).setValue("ClassRoom");
+      if (!sheet.getRange(1, 23).getValue()) sheet.getRange(1, 23).setValue("CompletedStages");
     }
     var d = JSON.parse(e.postData.contents);
     var code = String(d.playerCode || "").trim().toUpperCase();
@@ -2546,11 +2552,12 @@
       pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
       pdfLinkFormula = '=HYPERLINK("' + pdfFile.getUrl() + '", "📄 เปิดเกียรติบัตร PDF")';
     }
-    var rowData = [d.timestamp, code, d.playerName, d.event, d.stage, d.totalScore, d.percent, d.level, d.ecoPoints, d.hp, d.s1, d.s2, d.s3, d.s4, d.s5, d.certStatus || "", d.certDate || "", d.teacherName || "", d.certSummary || "", pdfLinkFormula, String(d.playerPass || ""), String(d.playerClass || "")];
+    var codeCell = code ? "'" + code : "";
+    var rowData = [d.timestamp, codeCell, d.playerName, d.event, d.stage, d.totalScore, d.percent, d.level, d.ecoPoints, d.hp, d.s1, d.s2, d.s3, d.s4, d.s5, d.certStatus || "", d.certDate || "", d.teacherName || "", d.certSummary || "", pdfLinkFormula, (d.playerPass ? "'" + String(d.playerPass) : ""), String(d.playerClass || ""), String(d.completedStages || "")];
     var values = sheet.getDataRange().getValues();
     var foundRow = -1;
     for (var i = 1; i < values.length; i++) {
-      if (String(values[i][1] || "").trim().toUpperCase() === code && code !== "") {
+      if (String(values[i][1] || "").replace(/^'/, "").trim().toUpperCase() === code && code !== "") {
         foundRow = i + 1;
         break;
       }
@@ -2570,11 +2577,11 @@
       } else if (!certSheet.getRange(1, 9).getValue()) {
         certSheet.getRange(1, 9).setValue("CertPDF");
       }
-      var certData = [d.certDate, code, d.playerName, d.level, d.percent, d.totalScore, d.teacherName, d.certSummary, pdfLinkFormula];
+      var certData = [d.certDate, codeCell, d.playerName, d.level, d.percent, d.totalScore, d.teacherName, d.certSummary, pdfLinkFormula];
       var cVals = certSheet.getDataRange().getValues();
       var cRow = -1;
       for (var j = 1; j < cVals.length; j++) {
-        if (String(cVals[j][1] || "").trim().toUpperCase() === code && code !== "") {
+        if (String(cVals[j][1] || "").replace(/^'/, "").trim().toUpperCase() === code && code !== "") {
           cRow = j + 1;
           break;
         }
@@ -2585,6 +2592,7 @@
         certSheet.appendRow(certData);
       }
     }
+    SpreadsheetApp.flush();
     return ContentService.createTextOutput(JSON.stringify({status:"ok"})).setMimeType(ContentService.MimeType.JSON);
   } finally {
     lock.releaseLock();
@@ -2598,9 +2606,9 @@ function doGet(e) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
   var values = sheet.getDataRange().getValues();
   for (var i = 1; i < values.length; i++) {
-    if (String(values[i][1] || "").trim().toUpperCase() === code) {
+    if (String(values[i][1] || "").replace(/^'/, "").trim().toUpperCase() === code) {
       var r = values[i];
-      var savedPass = String(r[20] || "").trim();
+      var savedPass = String(r[20] || "").replace(/^'/, "").trim();
       if (savedPass && savedPass !== pass) {
         return ContentService.createTextOutput(JSON.stringify({found:true, authOk:false})).setMimeType(ContentService.MimeType.JSON);
       }
@@ -2610,6 +2618,7 @@ function doGet(e) {
         playerCode: code,
         playerName: r[2],
         playerClass: r[21] || "ม.3",
+        completedStages: String(r[22] || ""),
         totalScore: Number(r[5] || 0),
         ecoPoints: Number(r[8] || 0),
         hp: Number(r[9] || 100),

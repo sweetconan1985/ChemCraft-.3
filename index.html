@@ -1,0 +1,2249 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ChemCraft M.3 | ปฏิบัติการนักเคมีและวิศวกรวัสดุ (สสวท.)</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --navy-bg: #050b18;
+      --navy-card: #0b162c;
+      --navy-elevated: #112240;
+      --cyan-primary: #00e5ff;
+      --cyan-soft: #38bdf8;
+    }
+    body {
+      font-family: 'Noto Sans Thai', 'Inter', sans-serif;
+      background-color: var(--navy-bg);
+      color: #e2e8f0;
+      overflow-x: hidden;
+    }
+    .cyber-card {
+      background: linear-gradient(145deg, rgba(17, 34, 64, 0.92), rgba(11, 22, 44, 0.96));
+      border: 1px solid rgba(0, 229, 255, 0.25);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(56, 189, 248, 0.12);
+    }
+    .cyan-glow {
+      box-shadow: 0 0 18px rgba(0, 229, 255, 0.35);
+    }
+    .btn-option {
+      background: rgba(15, 29, 56, 0.9);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      transition: all 0.18s ease;
+    }
+    .btn-option:hover:not(:disabled) {
+      border-color: #00e5ff;
+      background: rgba(0, 229, 255, 0.12);
+      transform: translateY(-1px);
+    }
+    .btn-option:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+    .pulse-ring {
+      animation: pulseCyan 2.2s infinite;
+    }
+    @keyframes pulseCyan {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(0, 229, 255, 0.35); }
+      50% { box-shadow: 0 0 0 10px rgba(0, 229, 255, 0); }
+    }
+    #bgCanvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+    }
+    #certPrintArea {
+      display: none;
+    }
+    @media print {
+      @page {
+        size: A4 landscape;
+        margin: 0;
+      }
+      body {
+        background: #ffffff !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      header, main, #bgCanvas, #codexModal, #toastBox, #teacherModal {
+        display: none !important;
+      }
+      #certPrintArea {
+        display: flex !important;
+        width: 297mm;
+        height: 210mm;
+        align-items: center;
+        justify-content: center;
+        background: #060d1f !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+  <canvas id="bgCanvas"></canvas>
+
+  <!-- Top HUD -->
+  <header class="relative z-10 border-b border-cyan-500/25 bg-[#071124]/90 backdrop-blur-md sticky top-0">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-lg bg-cyan-500/15 border border-cyan-400/50 flex items-center justify-center text-cyan-300 font-extrabold text-lg">
+          ⚗️
+        </div>
+        <div>
+          <h1 class="text-sm sm:text-base font-extrabold tracking-wide text-cyan-300 leading-tight">
+            ChemCraft M.3
+          </h1>
+          <p class="text-[11px] text-slate-400 leading-tight">ปฏิกิริยาเคมีและวัสดุฯ (สสวท.)</p>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm">
+        <div class="px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-700 flex items-center gap-1.5">
+          <span class="text-rose-400 font-bold">HP</span>
+          <div class="w-16 sm:w-20 h-2 bg-slate-800 rounded-full overflow-hidden">
+            <div id="hudHpBar" class="h-full bg-gradient-to-r from-rose-500 to-emerald-400 transition-all duration-300" style="width: 100%"></div>
+          </div>
+          <span id="hudHpText" class="font-bold text-slate-200">100</span>
+        </div>
+
+        <div class="px-2.5 py-1 rounded-lg bg-slate-900/80 border border-cyan-500/30 font-bold text-cyan-300">
+          ⭐ <span id="hudScore">0</span>
+        </div>
+
+        <div class="px-2.5 py-1 rounded-lg bg-slate-900/80 border border-emerald-500/30 font-bold text-emerald-300">
+          🌱 <span id="hudEco">0</span>
+        </div>
+
+        <button id="btnCodex" type="button" class="px-2.5 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/40 text-cyan-200 font-semibold transition">
+          📘 Codex (<span id="codexCount">0</span>/5)
+        </button>
+
+        <span id="hudSaveStatus" class="hidden px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-[11px] font-semibold">
+          💾 เซฟแล้ว
+        </span>
+
+        <button id="btnSwitchAccount" type="button" title="สลับรหัสผู้เล่น" class="hidden px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-xs font-semibold transition">
+          🔑 สลับรหัส
+        </button>
+
+        <button id="btnMute" type="button" aria-label="เปิดหรือปิดเสียง" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition">
+          🔊
+        </button>
+      </div>
+    </div>
+
+    <!-- 5-Stage Progress Stepper -->
+    <div id="stageStepper" class="max-w-5xl mx-auto px-4 pb-2.5 hidden">
+      <div class="grid grid-cols-5 gap-1.5 text-[11px]">
+        <div data-step="1" class="step-pill text-center py-1 rounded bg-slate-800/80 text-slate-400 border border-slate-700/60 truncate px-1">1. อะตอม &amp; มวล</div>
+        <div data-step="2" class="step-pill text-center py-1 rounded bg-slate-800/80 text-slate-400 border border-slate-700/60 truncate px-1">2. ดูด-คายความร้อน</div>
+        <div data-step="3" class="step-pill text-center py-1 rounded bg-slate-800/80 text-slate-400 border border-slate-700/60 truncate px-1">3. กรด-เบส &amp; สนิม</div>
+        <div data-step="4" class="step-pill text-center py-1 rounded bg-slate-800/80 text-slate-400 border border-slate-700/60 truncate px-1">4. วัสดุรอบตัว</div>
+        <div data-step="5" class="step-pill text-center py-1 rounded bg-slate-800/80 text-slate-400 border border-slate-700/60 truncate px-1">5. บอส STEM</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="relative z-10 flex-1 max-w-4xl w-full mx-auto px-4 py-6 flex flex-col justify-center">
+    <div id="gameContainer" class="cyber-card rounded-2xl p-5 sm:p-8">
+      <!-- Dynamic views rendered here -->
+    </div>
+  </main>
+
+  <!-- Codex Modal -->
+  <div id="codexModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+    <div class="cyber-card rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden">
+      <div class="px-5 py-4 border-b border-cyan-500/25 flex items-center justify-between bg-[#081329]">
+        <h2 class="text-lg font-bold text-cyan-300">📘 สมุดบันทึกสมการและวัสดุ (Reaction Codex)</h2>
+        <button id="btnCloseCodex" type="button" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold">ปิด</button>
+      </div>
+      <div id="codexBody" class="p-5 overflow-y-auto space-y-3 text-sm"></div>
+    </div>
+  </div>
+
+  <!-- Teacher Google Sheet Setup Modal -->
+  <div id="teacherModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+    <div class="cyber-card rounded-2xl max-w-xl w-full max-h-[88vh] flex flex-col overflow-hidden">
+      <div class="px-5 py-4 border-b border-cyan-500/25 flex items-center justify-between bg-[#081329]">
+        <h2 class="text-base sm:text-lg font-bold text-cyan-300">📊 ตั้งค่าส่งคะแนนเข้า Google Sheet (Real-Time)</h2>
+        <button id="btnCloseTeacherModal" type="button" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold">ปิด</button>
+      </div>
+      <div class="p-5 overflow-y-auto space-y-4 text-xs sm:text-sm">
+        <div class="space-y-1.5">
+          <label for="sheetUrlInput" class="block font-semibold text-cyan-200">Google Apps Script Web App URL</label>
+          <input id="sheetUrlInput" type="url" placeholder="https://script.google.com/macros/s/.../exec" class="w-full px-3.5 py-2.5 rounded-xl bg-[#071124] border border-cyan-500/40 text-white focus:outline-none focus:border-cyan-300 text-xs" />
+          <p class="text-[11px] text-slate-400">เมื่อตั้งค่าแล้ว ระบบจะส่งคะแนนของนักเรียนเข้า Google Sheet อัตโนมัติทุกครั้งที่จบด่านและจบเกม</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button id="btnSaveSheetUrl" type="button" class="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs transition">
+            💾 บันทึก URL
+          </button>
+          <button id="btnCopyAppsScript" type="button" class="px-4 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/50 text-emerald-200 font-bold text-xs transition">
+            📋 คัดลอกโค้ด Apps Script (doPost)
+          </button>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-700 text-[11px] text-slate-300 space-y-1">
+          <div class="font-bold text-cyan-300">วิธีติดตั้งใน Google Sheets (1 นาที):</div>
+          <div>1. เปิด Google Sheet → เมนู <strong>ส่วนขยาย (Extensions) &gt; Apps Script</strong></div>
+          <div>2. กดคัดลอกโค้ดด้านบนไปวางทับโค้ดเดิม แล้วกด <strong>Deploy &gt; New deployment &gt; Web app</strong></div>
+          <div>3. ตั้งค่า Who has access เป็น <strong>Anyone (ทุกคน)</strong> แล้วนำ URL มาวางที่นี่</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- A4 Landscape Printable Certificate Area -->
+  <div id="certPrintArea"></div>
+
+  <!-- Toast Banner -->
+  <div id="toastBox" class="fixed bottom-5 right-5 z-50 hidden max-w-sm px-4 py-3 rounded-xl border bg-[#0b162c]/95 shadow-2xl text-sm font-medium transition-all"></div>
+
+  <script>
+    // --- Web Audio API Synthesizer (No external audio files needed) ---
+    const SoundFX = (() => {
+      let ctx = null;
+      function ensureCtx() {
+        if (!ctx && (window.AudioContext || window.webkitAudioContext)) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          ctx = new AudioCtx();
+        }
+        if (ctx && ctx.state === 'suspended') {
+          ctx.resume().catch(() => {});
+        }
+      }
+      function playTone(freq, duration, type = 'sine', gainVal = 0.12, delay = 0) {
+        if (state.muted) return;
+        try {
+          ensureCtx();
+          if (!ctx) return;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
+          gain.gain.setValueAtTime(gainVal, ctx.currentTime + delay);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + duration);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(ctx.currentTime + delay);
+          osc.stop(ctx.currentTime + delay + duration);
+        } catch (_) {}
+      }
+      return {
+        click: () => playTone(520, 0.06, 'triangle', 0.08),
+        correct: () => {
+          playTone(523.25, 0.12, 'sine', 0.12, 0);
+          playTone(659.25, 0.12, 'sine', 0.12, 0.09);
+          playTone(783.99, 0.22, 'sine', 0.14, 0.18);
+        },
+        wrong: () => {
+          playTone(220, 0.16, 'sawtooth', 0.09, 0);
+          playTone(175, 0.24, 'sawtooth', 0.09, 0.14);
+        },
+        stageClear: () => {
+          [523, 659, 784, 1046].forEach((f, i) => playTone(f, 0.18, 'triangle', 0.12, i * 0.09));
+        }
+      };
+    })();
+
+    // --- Grounded Curriculum Codex Data (สสวท. ม.3 เล่ม 2 หน่วยที่ 5) ---
+    const CODEX_ENTRIES = [
+      {
+        stage: 1,
+        code: 'ว 2.1 ม.3/3, ม.3/4',
+        title: 'การเกิดปฏิกิริยาเคมีและกฎทรงมวล',
+        summary: 'ปฏิกิริยาเคมีเกิดจากอะตอมของสารตั้งต้นจัดเรียงตัวใหม่เป็นผลิตภัณฑ์ สังเกตได้จากฟองแก๊ส ตะกอน สี/กลิ่น หรืออุณหภูมิเปลี่ยน และในระบบปิด มวลรวมก่อนเกิดปฏิกิริยา = มวลรวมหลังเกิดปฏิกิริยา (กฎทรงมวล)'
+      },
+      {
+        stage: 2,
+        code: 'ว 2.1 ม.3/5',
+        title: 'ปฏิกิริยาดูดความร้อน vs คายความร้อน',
+        summary: 'ดูดความร้อน (Endothermic) จะดูดพลังงานความร้อนจากสิ่งแวดล้อม ทำให้อุณหภูมิรอบข้างลดลง (เช่น ถุงประคบเย็น) ส่วนคายความร้อน (Exothermic) จะปล่อยความร้อนสู่สิ่งแวดล้อม ทำให้อุณหภูมิรอบข้างสูงขึ้น (เช่น อุปกรณ์อุ่นอาหาร)'
+      },
+      {
+        stage: 3,
+        code: 'ว 2.1 ม.3/6',
+        title: 'สมการข้อความของปฏิกิริยาเคมีรอบตัว',
+        summary: 'กรด + เบส → เกลือ + น้ำ | กรด + โลหะ → เกลือของโลหะ + แก๊สไฮโดรเจน | เหล็ก + ออกซิเจน + น้ำ → สนิมเหล็ก | แก๊สคาร์บอนไดออกไซด์ + น้ำ → น้ำตาลกลูโคส + แก๊สออกซิเจน (สังเคราะห์ด้วยแสง)'
+      },
+      {
+        stage: 4,
+        code: 'ว 2.1 ม.3/1, ม.3/2',
+        title: 'พอลิเมอร์ เซรามิก โลหะ และวัสดุผสม',
+        summary: 'พอลิเมอร์ (ไม่นำไฟฟ้า เบา) เซรามิก (แข็งแต่เปราะ ทนความร้อน ฉนวนไฟฟ้า) โลหะ (เหนียว นำไฟฟ้าและความร้อนดี) และวัสดุผสม (รวมวัสดุต่างชนิดให้สมบัติดีกว่าเดิม เช่น คอนกรีตเสริมเหล็ก ไฟเบอร์กลาส) พร้อมใช้อย่างประหยัดคุ้มค่า'
+      },
+      {
+        stage: 5,
+        code: 'ว 2.1 ม.3/7, ม.3/8',
+        title: 'ผลกระทบต่อสิ่งแวดล้อมและการแก้ปัญหาแบบ STEM',
+        summary: 'การเผาไหม้ไม่สมบูรณ์ก่อให้เกิดแก๊สพิษคาร์บอนมอนอกไซด์และเขม่าควัน ส่วนซัลเฟอร์ไดออกไซด์ทำให้เกิดฝนกรด การแก้ปัญหาต้องผสานวิทยาศาสตร์ คณิตศาสตร์ เทคโนโลยี และวิศวกรรมศาสตร์อย่างยั่งยืน'
+      }
+    ];
+
+    const INDICATOR_LIST = [
+      { id: 'ว 2.1 ม.3/1', desc: 'สมบัติและการใช้ประโยชน์พอลิเมอร์ เซรามิก วัสดุผสม' },
+      { id: 'ว 2.1 ม.3/2', desc: 'แนวทางใช้วัสดุอย่างประหยัดและคุ้มค่า' },
+      { id: 'ว 2.1 ม.3/3', desc: 'การเกิดปฏิกิริยาเคมี การจัดเรียงตัวใหม่ของอะตอม สมการข้อความ' },
+      { id: 'ว 2.1 ม.3/4', desc: 'กฎทรงมวลโดยใช้หลักฐานเชิงประจักษ์' },
+      { id: 'ว 2.1 ม.3/5', desc: 'วิเคราะห์ปฏิกิริยาดูดความร้อนและคายความร้อน' },
+      { id: 'ว 2.1 ม.3/6', desc: 'ปฏิกิริยาสนิม กรด-เบส กรด-โลหะ เผาไหม้ ฝนกรด สังเคราะห์ด้วยแสง' },
+      { id: 'ว 2.1 ม.3/7', desc: 'ประโยชน์ โทษ และวิธีป้องกันปัญหาจากปฏิกิริยาเคมี' },
+      { id: 'ว 2.1 ม.3/8', desc: 'ออกแบบวิธีแก้ปัญหาในชีวิตประจำวันแบบ STEM' }
+    ];
+
+    // --- Game State & Auto-Save Engine ---
+    const SAVE_PREFIX = 'chemcraft_m3_save_';
+    const LAST_CODE_KEY = 'chemcraft_m3_last_code';
+    const SHEET_URL_KEY = 'chemcraft_m3_sheet_url';
+    const DEFAULT_SHEET_URL = 'https://script.google.com/macros/s/AKfycbwZ6-hwkqngcgE6QF5jJ9Zr0zwJNaXnkQZa8hK-ovzA7L3uTm0Exg_RPUQFowfPjXHO/exec'; // ครูสามารถใส่ URL ของ Apps Script ตรงนี้ถาวรก่อนอัปขึ้น GitHub Pages ได้เลย
+
+    const state = {
+      playerCode: '',
+      playerName: 'นักวิจัย ม.3',
+      stage: 0, // 0=start, 1..5=stages, 6=victory
+      subStep: 0,
+      hp: 100,
+      score: 0,
+      stageScores: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+      wrongInCurrentQ: 0,
+      replayMode: false,
+      ecoPoints: 0,
+      muted: false,
+      unlockedCodex: [],
+      mastered: {},
+      bossHp: 100,
+      stage1AnimPlayed: false,
+      stage2Temp: 28,
+      stage4Tested: { polymer: false, ceramic: false, metal: false }
+    };
+
+    const dom = {
+      container: document.getElementById('gameContainer'),
+      hpBar: document.getElementById('hudHpBar'),
+      hpText: document.getElementById('hudHpText'),
+      score: document.getElementById('hudScore'),
+      eco: document.getElementById('hudEco'),
+      stepper: document.getElementById('stageStepper'),
+      codexCount: document.getElementById('codexCount'),
+      codexModal: document.getElementById('codexModal'),
+      codexBody: document.getElementById('codexBody'),
+      toast: document.getElementById('toastBox'),
+      btnMute: document.getElementById('btnMute'),
+      hudSaveStatus: document.getElementById('hudSaveStatus'),
+      btnSwitchAccount: document.getElementById('btnSwitchAccount')
+    };
+
+    function normalizeCode(raw) {
+      return String(raw || '').trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
+    }
+
+    function saveProgress() {
+      if (!state.playerCode || state.stage < 1) return;
+      try {
+        const payload = {
+          playerCode: state.playerCode,
+          playerName: state.playerName,
+          stage: state.stage,
+          subStep: state.subStep,
+          hp: state.hp,
+          score: state.score,
+          stageScores: state.stageScores,
+          ecoPoints: state.ecoPoints,
+          unlockedCodex: state.unlockedCodex,
+          mastered: state.mastered,
+          bossHp: state.bossHp,
+          stage2Temp: state.stage2Temp,
+          stage4Tested: state.stage4Tested,
+          updatedAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
+        };
+        localStorage.setItem(SAVE_PREFIX + state.playerCode, JSON.stringify(payload));
+        localStorage.setItem(LAST_CODE_KEY, state.playerCode);
+        if (dom.hudSaveStatus) {
+          dom.hudSaveStatus.textContent = `💾 เซฟแล้ว (${payload.updatedAt})`;
+          dom.hudSaveStatus.classList.remove('hidden');
+        }
+      } catch (_) {}
+    }
+
+    function loadProgressByCode(code) {
+      const clean = normalizeCode(code);
+      if (!clean) return null;
+      try {
+        const raw = localStorage.getItem(SAVE_PREFIX + clean);
+        return raw ? JSON.parse(raw) : null;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function applySavedData(data) {
+      Object.assign(state, {
+        playerCode: data.playerCode || '',
+        playerName: data.playerName || 'นักวิจัย ม.3',
+        stage: Number(data.stage || 1),
+        subStep: Number(data.subStep || 0),
+        hp: Number(data.hp ?? 100),
+        score: Number(data.score || 0),
+        stageScores: data.stageScores || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+        wrongInCurrentQ: 0,
+        replayMode: false,
+        ecoPoints: Number(data.ecoPoints || 0),
+        unlockedCodex: Array.isArray(data.unlockedCodex) ? data.unlockedCodex : [],
+        mastered: data.mastered || {},
+        bossHp: Number(data.bossHp ?? 100),
+        stage2Temp: Number(data.stage2Temp ?? 28),
+        stage4Tested: data.stage4Tested || { polymer: false, ceramic: false, metal: false }
+      });
+    }
+
+    function exportSaveToken() {
+      const data = {
+        playerCode: state.playerCode || 'GUEST',
+        playerName: state.playerName,
+        stage: state.stage,
+        subStep: state.subStep,
+        hp: state.hp,
+        score: state.score,
+        stageScores: state.stageScores,
+        ecoPoints: state.ecoPoints,
+        unlockedCodex: state.unlockedCodex,
+        mastered: state.mastered,
+        bossHp: state.bossHp
+      };
+      return btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+    }
+
+    function importSaveToken(token) {
+      const jsonStr = decodeURIComponent(escape(atob(token.trim())));
+      const data = JSON.parse(jsonStr);
+      if (!data || typeof data.stage !== 'number') throw new Error('Invalid token');
+      return data;
+    }
+
+    function getSheetUrl() {
+      try {
+        return localStorage.getItem(SHEET_URL_KEY) || DEFAULT_SHEET_URL;
+      } catch (_) {
+        return DEFAULT_SHEET_URL;
+      }
+    }
+
+    function getEvalResult() {
+      const totalScore = Object.values(state.stageScores).reduce((a, b) => a + Number(b || 0), 0);
+      const percent = Math.round((totalScore / 5000) * 100);
+      if (percent >= 80) return { totalScore, percent, level: 'The finest', passed: true, badgeColor: 'text-amber-300 border-amber-400/50 bg-amber-500/15' };
+      if (percent >= 70) return { totalScore, percent, level: 'Excellent', passed: true, badgeColor: 'text-cyan-300 border-cyan-400/50 bg-cyan-500/15' };
+      if (percent >= 60) return { totalScore, percent, level: 'Good', passed: true, badgeColor: 'text-emerald-300 border-emerald-400/50 bg-emerald-500/15' };
+      return { totalScore, percent, level: 'ไม่ผ่านเกณฑ์', passed: false, badgeColor: 'text-rose-300 border-rose-400/50 bg-rose-500/15' };
+    }
+
+    async function sendToGoogleSheet(eventLabel) {
+      const url = getSheetUrl().trim();
+      if (!url || !url.startsWith('https://')) return false;
+      const ev = getEvalResult();
+      const payload = {
+        timestamp: new Date().toLocaleString('th-TH'),
+        playerCode: state.playerCode || 'GUEST',
+        playerName: state.playerName,
+        event: eventLabel,
+        stage: state.stage,
+        totalScore: ev.totalScore,
+        percent: ev.percent,
+        level: ev.level,
+        ecoPoints: state.ecoPoints,
+        hp: state.hp,
+        s1: state.stageScores[1] || 0,
+        s2: state.stageScores[2] || 0,
+        s3: state.stageScores[3] || 0,
+        s4: state.stageScores[4] || 0,
+        s5: state.stageScores[5] || 0
+      };
+      try {
+        await fetch(url, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload)
+        });
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    let toastTimer = null;
+    function showToast(msg, type = 'info') {
+      clearTimeout(toastTimer);
+      const colors = {
+        success: 'border-emerald-400/60 text-emerald-200',
+        error: 'border-rose-400/60 text-rose-200',
+        info: 'border-cyan-400/60 text-cyan-200'
+      };
+      dom.toast.className = `fixed bottom-5 right-5 z-50 max-w-sm px-4 py-3 rounded-xl border bg-[#0b162c]/95 shadow-2xl text-sm font-medium ${colors[type] || colors.info}`;
+      dom.toast.textContent = msg;
+      dom.toast.classList.remove('hidden');
+      toastTimer = setTimeout(() => dom.toast.classList.add('hidden'), 3200);
+    }
+
+    function updateHUD() {
+      dom.hpBar.style.width = `${Math.max(0, state.hp)}%`;
+      dom.hpText.textContent = Math.max(0, state.hp);
+      dom.score.textContent = state.score;
+      dom.eco.textContent = state.ecoPoints;
+      dom.codexCount.textContent = state.unlockedCodex.length;
+
+      if (state.stage >= 1) {
+        dom.btnSwitchAccount.classList.remove('hidden');
+        if (state.playerCode) dom.hudSaveStatus.classList.remove('hidden');
+      } else {
+        dom.btnSwitchAccount.classList.add('hidden');
+        dom.hudSaveStatus.classList.add('hidden');
+      }
+
+      if (state.stage >= 1 && state.stage <= 5) {
+        dom.stepper.classList.remove('hidden');
+        document.querySelectorAll('.step-pill').forEach((el) => {
+          const s = Number(el.dataset.step);
+          if (s < state.stage) {
+            el.className = 'step-pill text-center py-1 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 truncate px-1 font-semibold';
+          } else if (s === state.stage) {
+            el.className = 'step-pill text-center py-1 rounded bg-cyan-500/25 text-cyan-200 border border-cyan-400 truncate px-1 font-bold';
+          } else {
+            el.className = 'step-pill text-center py-1 rounded bg-slate-800/80 text-slate-400 border border-slate-700/60 truncate px-1';
+          }
+        });
+      } else {
+        dom.stepper.classList.add('hidden');
+      }
+    }
+
+    function unlockCodex(stageNum) {
+      if (!state.unlockedCodex.includes(stageNum)) {
+        state.unlockedCodex.push(stageNum);
+      }
+    }
+
+    function markMastered(codes) {
+      codes.forEach((c) => { state.mastered[c] = true; });
+    }
+
+    function handleAnswer(isCorrect, feedbackText, onSuccess, ecoBonus = 0) {
+      if (isCorrect) {
+        SoundFX.correct();
+        const earned = state.wrongInCurrentQ === 0 ? 100 : (state.wrongInCurrentQ === 1 ? 50 : 0);
+        if (state.stage >= 1 && state.stage <= 5) {
+          state.stageScores[state.stage] = (state.stageScores[state.stage] || 0) + earned;
+        }
+        state.score = Object.values(state.stageScores).reduce((a, b) => a + Number(b || 0), 0);
+        state.wrongInCurrentQ = 0;
+        if (ecoBonus > 0) state.ecoPoints += ecoBonus;
+        updateHUD();
+        showToast(`${feedbackText} (+${earned} คะแนน)`, 'success');
+        const prevStage = state.stage;
+        onSuccess();
+        if (state.stage !== prevStage) {
+          sendToGoogleSheet(`ผ่านด่านที่ ${prevStage}`);
+          if (state.replayMode && state.stage <= 5) {
+            state.replayMode = false;
+            state.stage = 6;
+            render();
+          }
+        }
+      } else {
+        SoundFX.wrong();
+        state.wrongInCurrentQ += 1;
+        state.hp = Math.max(0, state.hp - 15);
+        updateHUD();
+        if (state.hp <= 0) {
+          renderGameOverModal(feedbackText);
+        } else {
+          showToast(`❌ ${feedbackText} (-15 HP)`, 'error');
+        }
+      }
+    }
+
+    function renderGameOverModal(reason) {
+      dom.container.innerHTML = `
+        <div class="text-center py-8 space-y-5">
+          <div class="text-5xl">⚠️</div>
+          <h2 class="text-2xl font-extrabold text-rose-400">พลังงานห้องแล็บหมด (0 HP)</h2>
+          <p class="text-slate-300 max-w-md mx-auto text-sm leading-relaxed">${reason}</p>
+          <button id="btnRetryStage" type="button" class="px-6 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold transition cyan-glow">
+            🔄 ฟื้นฟู HP และลองด่านนี้อีกครั้ง
+          </button>
+        </div>
+      `;
+      document.getElementById('btnRetryStage').addEventListener('click', () => {
+        SoundFX.click();
+        state.hp = 100;
+        updateHUD();
+        render();
+      });
+    }
+
+    // --- Stage Renderers ---
+    function renderStart() {
+      let defaultCode = state.playerCode;
+      if (!defaultCode) {
+        try { defaultCode = localStorage.getItem(LAST_CODE_KEY) || ''; } catch (_) {}
+      }
+
+      dom.container.innerHTML = `
+        <div class="text-center space-y-5 py-2">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-400/40 text-cyan-300 text-xs font-semibold">
+            🔬 วิทยาศาสตร์และเทคโนโลยี ม.3 เล่ม 2 (สสวท.) | ครบ 8 ตัวชี้วัด ว 2.1
+          </div>
+          <h2 class="text-3xl sm:text-4xl font-extrabold text-white leading-tight">
+            ChemCraft: <span class="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-sky-400">ปฏิบัติการนักเคมีและวิศวกรวัสดุ</span>
+          </h2>
+          <p class="text-slate-300 max-w-xl mx-auto text-sm leading-relaxed">
+            กรอกรหัสประจำตัวเพื่อเข้าสู่ระบบและเปิดใช้งาน <strong>เซฟอัตโนมัติ (Auto-Save)</strong> เล่นค้างไว้กลับมาเล่นต่อได้ทันที
+          </p>
+
+          <div class="max-w-md mx-auto p-4 rounded-2xl bg-[#071124]/90 border border-cyan-500/35 space-y-3 text-left">
+            <div>
+              <label for="playerCodeInput" class="block text-xs font-semibold text-cyan-300 mb-1">🔑 รหัสนักเรียน / รหัสผู้เล่น (ภาษาอังกฤษหรือตัวเลข)</label>
+              <input id="playerCodeInput" type="text" maxlength="20" value="${defaultCode}" placeholder="เช่น 67001 หรือ M3-05" class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-cyan-500/40 text-white focus:outline-none focus:border-cyan-300 text-sm uppercase tracking-wider" />
+            </div>
+            <div>
+              <label for="playerNameInput" class="block text-xs font-semibold text-cyan-300 mb-1">👤 ชื่อนักวิจัย / นักเรียน</label>
+              <input id="playerNameInput" type="text" maxlength="30" value="${state.playerName}" placeholder="พิมพ์ชื่อของคุณ..." class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-cyan-500/40 text-white focus:outline-none focus:border-cyan-300 text-sm" />
+            </div>
+
+            <div id="savedProfileBox" class="hidden p-3 rounded-xl bg-emerald-500/10 border border-emerald-400/40 space-y-2.5">
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-bold text-emerald-300">💾 พบข้อมูลเซฟอัตโนมัติ!</span>
+                <span id="savedTimeText" class="text-slate-400"></span>
+              </div>
+              <div id="savedInfoText" class="text-xs text-slate-200"></div>
+              <div class="grid grid-cols-2 gap-2">
+                <button id="btnContinueSave" type="button" class="px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs transition">
+                  ▶️ เล่นต่อจากที่เซฟ
+                </button>
+                <button id="btnResetSave" type="button" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 font-semibold text-xs transition">
+                  🔄 เริ่มใหม่รหัสนี้
+                </button>
+              </div>
+            </div>
+
+            <button id="btnStartGame" type="button" class="w-full px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-400 to-sky-500 hover:from-cyan-300 hover:to-sky-400 text-slate-950 font-extrabold text-sm transition pulse-ring">
+              🚀 เข้าสู่เกมและเริ่มเซฟอัตโนมัติ
+            </button>
+          </div>
+
+          <div class="max-w-md mx-auto text-left space-y-2">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <button id="btnToggleTokenBox" type="button" class="text-xs text-cyan-300 hover:text-cyan-200 underline">
+                📥 มีรหัสเซฟข้ามเครื่อง (Save Token)?
+              </button>
+              <button id="btnOpenTeacherModal" type="button" class="text-xs text-amber-300 hover:text-amber-200 underline">
+                📊 ตั้งค่า Google Sheet (สำหรับครู)
+              </button>
+            </div>
+            <div id="tokenImportBox" class="hidden mt-2 p-3 rounded-xl bg-slate-900/90 border border-slate-700 space-y-2">
+              <input id="importTokenInput" type="text" placeholder="วางรหัสเซฟข้ามเครื่องที่นี่..." class="w-full px-3 py-2 rounded-lg bg-[#071124] border border-slate-600 text-xs text-slate-200 focus:outline-none focus:border-cyan-400" />
+              <button id="btnImportToken" type="button" class="px-4 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/50 text-cyan-200 text-xs font-bold">
+                กู้คืนเซฟและเข้าเล่นต่อ
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs text-slate-300 max-w-2xl mx-auto">
+            <div class="p-2 rounded-xl bg-slate-900/70 border border-slate-700/70">⚛️ ด่าน 1<br><span class="text-cyan-300 font-semibold">10 ข้อ</span></div>
+            <div class="p-2 rounded-xl bg-slate-900/70 border border-slate-700/70">🌡️ ด่าน 2<br><span class="text-cyan-300 font-semibold">10 ข้อ</span></div>
+            <div class="p-2 rounded-xl bg-slate-900/70 border border-slate-700/70">🧪 ด่าน 3<br><span class="text-cyan-300 font-semibold">10 ข้อ</span></div>
+            <div class="p-2 rounded-xl bg-slate-900/70 border border-slate-700/70">🧱 ด่าน 4<br><span class="text-cyan-300 font-semibold">10 ข้อ</span></div>
+            <div class="p-2 rounded-xl bg-slate-900/70 border border-slate-700/70 col-span-2 sm:col-span-1">🏙️ ด่าน 5<br><span class="text-cyan-300 font-semibold">10 ข้อ</span></div>
+          </div>
+        </div>
+      `;
+
+      const codeInput = document.getElementById('playerCodeInput');
+      const nameInput = document.getElementById('playerNameInput');
+      const savedBox = document.getElementById('savedProfileBox');
+      const savedInfo = document.getElementById('savedInfoText');
+      const savedTime = document.getElementById('savedTimeText');
+      const btnStart = document.getElementById('btnStartGame');
+
+      function refreshSavePreview() {
+        const clean = normalizeCode(codeInput.value);
+        const found = loadProgressByCode(clean);
+        if (found) {
+          savedBox.classList.remove('hidden');
+          btnStart.classList.add('hidden');
+          const stageLabel = found.stage > 5 ? 'จบครบ 5 ด่านแล้ว' : `ด่านที่ ${found.stage}/5 • ข้อที่ ${found.subStep + 1}/10`;
+          savedInfo.textContent = `ผู้เล่น: ${found.playerName} | ${stageLabel} | คะแนน ${found.score} | HP ${found.hp}`;
+          savedTime.textContent = found.updatedAt ? `บันทึกล่าสุด ${found.updatedAt}` : '';
+          if (found.playerName && !nameInput.dataset.edited) nameInput.value = found.playerName;
+        } else {
+          savedBox.classList.add('hidden');
+          btnStart.classList.remove('hidden');
+        }
+      }
+
+      codeInput.addEventListener('input', refreshSavePreview);
+      nameInput.addEventListener('input', () => { nameInput.dataset.edited = '1'; });
+      refreshSavePreview();
+
+      function startFreshWithCode() {
+        const clean = normalizeCode(codeInput.value);
+        if (!clean) {
+          showToast('กรุณากรอกรหัสประจำตัวผู้เล่นก่อนเข้าเกม (เช่น 67001)', 'error');
+          codeInput.focus();
+          return;
+        }
+        SoundFX.click();
+        Object.assign(state, {
+          playerCode: clean,
+          playerName: nameInput.value.trim() || 'นักวิจัย ม.3',
+          stage: 1,
+          subStep: 0,
+          hp: 100,
+          score: 0,
+          stageScores: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+          wrongInCurrentQ: 0,
+          replayMode: false,
+          ecoPoints: 0,
+          unlockedCodex: [],
+          mastered: {},
+          bossHp: 100,
+          stage2Temp: 28,
+          stage4Tested: { polymer: false, ceramic: false, metal: false }
+        });
+        saveProgress();
+        render();
+      }
+
+      btnStart.addEventListener('click', startFreshWithCode);
+      document.getElementById('btnResetSave').addEventListener('click', startFreshWithCode);
+
+      document.getElementById('btnContinueSave').addEventListener('click', () => {
+        const clean = normalizeCode(codeInput.value);
+        const found = loadProgressByCode(clean);
+        if (!found) return;
+        SoundFX.click();
+        applySavedData(found);
+        if (nameInput.value.trim()) state.playerName = nameInput.value.trim();
+        showToast(`ยินดีต้อนรับกลับ ${state.playerName}!`, 'success');
+        render();
+      });
+
+      document.getElementById('btnToggleTokenBox').addEventListener('click', () => {
+        SoundFX.click();
+        document.getElementById('tokenImportBox').classList.toggle('hidden');
+      });
+
+      document.getElementById('btnOpenTeacherModal').addEventListener('click', () => {
+        SoundFX.click();
+        document.getElementById('sheetUrlInput').value = getSheetUrl();
+        const tm = document.getElementById('teacherModal');
+        tm.classList.remove('hidden');
+        tm.classList.add('flex');
+      });
+
+      document.getElementById('btnImportToken').addEventListener('click', () => {
+        const rawToken = document.getElementById('importTokenInput').value;
+        try {
+          const data = importSaveToken(rawToken);
+          SoundFX.correct();
+          applySavedData(data);
+          saveProgress();
+          showToast('กู้คืนเซฟข้ามเครื่องสำเร็จ!', 'success');
+          render();
+        } catch (_) {
+          SoundFX.wrong();
+          showToast('รหัสเซฟไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง', 'error');
+        }
+      });
+    }
+
+    // --- STAGE 1: Atom Rearrangement & Law of Conservation of Mass (10 Questions) ---
+    const STAGE1_QUESTIONS = [
+      {
+        code: 'ว 2.1 ม.3/3',
+        mode: 'atom',
+        title: 'หลักฐานการเกิดปฏิกิริยาเคมี',
+        prompt: 'ข้อใดไม่ใช่หลักฐานที่บ่งชี้ว่าอาจเกิดปฏิกิริยาเคมีขึ้นแล้ว?',
+        options: [
+          { text: 'A. เกิดฟองแก๊สหรือตะกอนที่ไม่ละลายน้ำ', ok: false },
+          { text: 'B. น้ำแข็งหลอมเหลวกลายเป็นน้ำเหลว', ok: true },
+          { text: 'C. มีการเปลี่ยนสี กลิ่น หรืออุณหภูมิเปลี่ยนไป', ok: false },
+          { text: 'D. เกิดแสงสว่างและความร้อนอย่างชัดเจน', ok: false }
+        ],
+        feedbackOk: '✅ ถูกต้อง! การหลอมเหลวเป็นการเปลี่ยนสถานะทางกายภาพ ไม่ใช่ปฏิกิริยาเคมี',
+        feedbackBad: 'สังเกตให้ดี: การเปลี่ยนสถานะไม่ได้สร้างสารใหม่ จึงไม่ใช่ปฏิกิริยาเคมี'
+      },
+      {
+        code: 'ว 2.1 ม.3/3',
+        mode: 'atom',
+        title: 'การจัดเรียงตัวใหม่ของอะตอม',
+        prompt: 'เมื่อแก๊สไฮโดรเจน (H₂) ทำปฏิกิริยากับแก๊สออกซิเจน (O₂) เกิดเป็นน้ำ (H₂O) อะตอมมีการเปลี่ยนแปลงอย่างไร?',
+        options: [
+          { text: 'A. อะตอมเดิมจัดเรียงตัวใหม่เป็นโมเลกุลน้ำ', ok: true },
+          { text: 'B. อะตอมไฮโดรเจนสลายตัวแล้วเปลี่ยนเป็นอะตอมออกซิเจน', ok: false },
+          { text: 'C. อะตอมออกซิเจนเพิ่มขึ้นเป็นสองเท่าจากความร้อน', ok: false },
+          { text: 'D. อะตอมไม่เปลี่ยนแปลงการจัดเรียงตัว เพียงแต่อยู่ใกล้กัน', ok: false }
+        ],
+        feedbackOk: '✅ ถูกต้อง! ปฏิกิริยาเคมีคือการจัดเรียงตัวใหม่ของอะตอมเดิม',
+        feedbackBad: 'ยังไม่ถูก: ในปฏิกิริยาเคมี อะตอมชนิดเดิมจะจัดเรียงตัวใหม่เพื่อสร้างสารใหม่'
+      },
+      {
+        code: 'ว 2.1 ม.3/3',
+        mode: 'atom',
+        title: 'สมการข้อความ: สารตั้งต้นและผลิตภัณฑ์',
+        prompt: 'จากสมการข้อความ: แคลเซียมคาร์บอเนต + กรดไฮโดรคลอริก → แคลเซียมคลอไรด์ + น้ำ + แก๊สคาร์บอนไดออกไซด์ ข้อใดคือสารตั้งต้นทั้งหมด?',
+        options: [
+          { text: 'A. แคลเซียมคลอไรด์ น้ำ และแก๊สคาร์บอนไดออกไซด์', ok: false },
+          { text: 'B. แคลเซียมคาร์บอเนต และแก๊สคาร์บอนไดออกไซด์', ok: false },
+          { text: 'C. แคลเซียมคาร์บอเนต และกรดไฮโดรคลอริก', ok: true },
+          { text: 'D. กรดไฮโดรคลอริก และแคลเซียมคลอไรด์', ok: false }
+        ],
+        feedbackOk: '✅ ถูกต้อง! สารตั้งต้นอยู่ทางด้านซ้ายของลูกศรในสมการข้อความ',
+        feedbackBad: 'จำง่ายๆ: สารตั้งต้นอยู่ฝั่งซ้ายของลูกศร ส่วนผลิตภัณฑ์อยู่ฝั่งขวาครับ'
+      },
+      {
+        code: 'ว 2.1 ม.3/3',
+        mode: 'atom',
+        title: 'จำนวนอะตอมก่อนและหลังเกิดปฏิกิริยา',
+        prompt: 'ข้อใดกล่าวถึงชนิดและจำนวนอะตอมเมื่อเกิดปฏิกิริยาเคมีได้ถูกต้องที่สุด?',
+        options: [
+          { text: 'A. ชนิดและจำนวนอะตอมรวมอาจลดลงเมื่อเกิดเป็นแก๊ส', ok: false },
+          { text: 'B. เกิดอะตอมของธาตุชนิดใหม่ที่ไม่เคยมีในสารตั้งต้น', ok: false },
+          { text: 'C. จำนวนอะตอมของผลิตภัณฑ์มากกว่าสารตั้งต้นเสมอ', ok: false },
+          { text: 'D. ชนิดและจำนวนอะตอมของแต่ละธาตุก่อนและหลังเท่าเดิม', ok: true }
+        ],
+        feedbackOk: '✅ เยี่ยมมาก! ชนิดและจำนวนอะตอมของแต่ละธาตุยังคงเท่าเดิมเสมอ',
+        feedbackBad: 'ยังไม่ถูก: อะตอมไม่สูญหายและไม่เกิดธาตุใหม่ จำนวนอะตอมแต่ละธาตุจึงเท่าเดิม'
+      },
+      {
+        code: 'ว 2.1 ม.3/3',
+        mode: 'atom',
+        title: 'ปฏิกิริยาเคมีในชีวิตประจำวัน',
+        prompt: 'เหตุการณ์ใดต่อไปนี้เกิดปฏิกิริยาเคมี?',
+        options: [
+          { text: 'A. การละลายน้ำตาลทรายในน้ำอุ่นจนใส', ok: false },
+          { text: 'B. การทอดไข่จนไข่ขาวเปลี่ยนสีและแข็งตัว', ok: true },
+          { text: 'C. การบดเกลือเม็ดหยาบให้เป็นผงละเอียด', ok: false },
+          { text: 'D. การต้มน้ำเดือดจนกลายเป็นไอน้ำลอยขึ้น', ok: false }
+        ],
+        feedbackOk: '✅ ถูกต้อง! การทอดไข่ทำให้โปรตีนเปลี่ยนแปลงเกิดสารใหม่ที่ย้อนกลับไม่ได้',
+        feedbackBad: 'ข้ออื่นเป็นการเปลี่ยนแปลงทางกายภาพ (ละลาย, บด, เปลี่ยนสถานะ) ลองเลือกใหม่ครับ'
+      },
+      {
+        code: 'ว 2.1 ม.3/4',
+        mode: 'scale',
+        title: 'กฎทรงมวลในระบบปิด',
+        prompt: 'ผสมสารละลายใส 2 ชนิดในขวดปิดฝาสนิท มวลรวมก่อนผสมเท่ากับ 120.0 กรัม หลังเกิดตะกอนแล้วมวลรวมจะเป็นเท่าใด?',
+        options: [
+          { text: 'A. 120.0 กรัม เท่าเดิม', ok: true },
+          { text: 'B. มากกว่า 120.0 กรัม เพราะตะกอนมีน้ำหนักมาก', ok: false },
+          { text: 'C. น้อยกว่า 120.0 กรัม เพราะสารตั้งต้นถูกใช้หมดไป', ok: false },
+          { text: 'D. 123.5 กรัม เพิ่มขึ้นตามความเข้มข้นของตะกอน', ok: false }
+        ],
+        feedbackOk: '✅ ถูกต้อง! ในระบบปิด มวลรวมหลังเกิดปฏิกิริยาเท่ากับมวลรวมก่อนเกิดปฏิกิริยาเสมอ',
+        feedbackBad: 'นึกถึงกฎทรงมวลในระบบปิด: ไม่มีสารเข้าหรือออกจากระบบ มวลรวมจึงต้องเท่าเดิม'
+      },
+      {
+        code: 'ว 2.1 ม.3/4',
+        mode: 'scale',
+        title: 'การชั่งมวลในระบบเปิดเมื่อเกิดแก๊ส',
+        prompt: 'เมื่อผสมน้ำส้มสายชูกับเบกกิ้งโซดาในขวดเปิดฝา (120.0 กรัม) พบว่าตัวเลขบนเครื่องชั่งลดลงเหลือ 116.5 กรัม เพราะเหตุใด?',
+        options: [
+          { text: 'A. กฎทรงมวลไม่เป็นจริงสำหรับสารที่เป็นกรดและเบส', ok: false },
+          { text: 'B. อะตอมของเบกกิ้งโซดาถูกทำลายหายไปในระหว่างปฏิกิริยา', ok: false },
+          { text: 'C. แก๊สคาร์บอนไดออกไซด์ที่เกิดขึ้นลอยหนีออกสู่อากาศ', ok: true },
+          { text: 'D. น้ำส้มสายชูระเหยหายไปทั้งหมดทันทีที่สัมผัสกับผงฟู', ok: false }
+        ],
+        feedbackOk: '✅ ถูกต้อง! มวล 3.5 กรัมที่หายไปคือมวลของแก๊สที่ลอยหนีออกจากระบบเปิด',
+        feedbackBad: 'สังเกตผลบนเครื่องชั่งระบบเปิด: แก๊สที่เกิดขึ้นลอยออกไปจึงไม่ได้ชั่งรวมอยู่ด้วย'
+      },
+      {
+        code: 'ว 2.1 ม.3/4',
+        mode: 'scale',
+        title: 'คำนวณมวลผลิตภัณฑ์ตามกฎทรงมวล',
+        prompt: 'เผาโลหะแมกนีเซียม 24 กรัม ให้ทำปฏิกิริยาพอดีกับแก๊สออกซิเจน 16 กรัม ในระบบปิด จะได้แมกนีเซียมออกไซด์กี่กรัม?',
+        options: [
+          { text: 'A. 8 กรัม', ok: false },
+          { text: 'B. 24 กรัม', ok: false },
+          { text: 'C. 32 กรัม', ok: false },
+          { text: 'D. 40 กรัม', ok: true }
+        ],
+        feedbackOk: '✅ ถูกต้อง! 24 + 16 = 40 กรัม ตามกฎทรงมวล',
+        feedbackBad: 'นำมวลสารตั้งต้นทั้งสองชนิดมาบวกกันได้เลยครับ (24 + 16)'
+      },
+      {
+        code: 'ว 2.1 ม.3/4',
+        mode: 'scale',
+        title: 'ปฏิกิริยาเกิดตะกอนในภาชนะเปิด',
+        prompt: 'หากเทสารละลาย A ผสมกับสารละลาย B ในบีกเกอร์เปิดฝา แล้วเกิดเพียง "ตะกอน" โดยไม่มีแก๊สเกิดขึ้น มวลบนเครื่องชั่งจะเป็นอย่างไร?',
+        options: [
+          { text: 'A. ลดลงเล็กน้อยเพราะตะกอนจมอยู่ก้นภาชนะ', ok: false },
+          { text: 'B. คงเดิมเท่ากับมวลรวมก่อนผสม', ok: true },
+          { text: 'C. เพิ่มขึ้นเพราะตะกอนเป็นของแข็งที่หนักกว่าของเหลว', ok: false },
+          { text: 'D. ลดลงครึ่งหนึ่งเมื่อตะกอนตกผลึกจนสมบูรณ์', ok: false }
+        ],
+        feedbackOk: '✅ เฉียบ! เมื่อไม่มีแก๊สหนีออกจากบีกเกอร์ มวลรวมจึงคงเดิมแม้จะเปิดฝา',
+        feedbackBad: 'ลองคิดดู: ปฏิกิริยานี้ไม่มีแก๊สหนีออกไปสู่อากาศเลย มวลรวมจึงต้องเป็นอย่างไร?'
+      },
+      {
+        code: 'ว 2.1 ม.3/4',
+        mode: 'scale',
+        title: 'สรุปใจความสำคัญของกฎทรงมวล',
+        prompt: 'ข้อใดสรุปเงื่อนไขของกฎทรงมวลได้ถูกต้องที่สุด?',
+        options: [
+          { text: 'A. มวลสารตั้งต้นเท่ากับมวลผลิตภัณฑ์เฉพาะเมื่อไม่มีความร้อนเกิดขึ้น', ok: false },
+          { text: 'B. มวลรวมของสารก่อนและหลังเกิดปฏิกิริยาจะเท่ากันเมื่อนับสารทุกชนิดรวมทั้งแก๊ส', ok: true },
+          { text: 'C. มวลของผลิตภัณฑ์ที่เป็นของแข็งต้องเท่ากับมวลสารตั้งต้นที่เป็นของแข็งเสมอ', ok: false },
+          { text: 'D. กฎทรงมวลใช้ได้เฉพาะกับการเปลี่ยนสถานะของน้ำเท่านั้น', ok: false }
+        ],
+        feedbackOk: '🎉 ผ่านด่านที่ 1 ครบทั้ง 10 ข้อ! เข้าใจการจัดเรียงอะตอมและกฎทรงมวลอย่างแม่นยำ',
+        feedbackBad: 'ทบทวนอีกครั้ง: กฎทรงมวลเป็นจริงเสมอเมื่อนับรวมมวลของสารตั้งต้นและผลิตภัณฑ์ทุกชนิด'
+      }
+    ];
+
+    function renderStage1() {
+      const q = STAGE1_QUESTIONS[state.subStep];
+      const totalQ = STAGE1_QUESTIONS.length;
+      const pct = Math.round(((state.subStep + 1) / totalQ) * 100);
+
+      const labWidget = q.mode === 'atom'
+        ? `<div class="rounded-xl bg-[#060f21] border border-cyan-500/30 p-4 flex flex-col items-center">
+            <canvas id="atomCanvas" width="460" height="140" class="max-w-full h-auto"></canvas>
+            <button id="btnPlayAtomAnim" type="button" class="mt-2 px-4 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/40 text-cyan-200 text-xs font-semibold">
+              ▶️ จำลองการจัดเรียงตัวใหม่ของอะตอม
+            </button>
+          </div>`
+        : `<div class="grid sm:grid-cols-2 gap-3">
+            <button id="btnClosedSys" type="button" class="p-4 rounded-xl bg-slate-900/80 border border-cyan-400/40 hover:bg-cyan-500/10 text-left transition">
+              <div class="font-bold text-cyan-300">🔒 ระบบปิด (ปิดฝาขวดแน่น)</div>
+              <div id="scaleClosed" class="text-xs text-slate-300 mt-1">คลิกเพื่อทดสอบเครื่องชั่ง: ก่อน 120.0 g</div>
+            </button>
+            <button id="btnOpenSys" type="button" class="p-4 rounded-xl bg-slate-900/80 border border-amber-400/40 hover:bg-amber-500/10 text-left transition">
+              <div class="font-bold text-amber-300">🔓 ระบบเปิด (ไม่ปิดฝาขวด)</div>
+              <div id="scaleOpen" class="text-xs text-slate-300 mt-1">คลิกเพื่อทดสอบเครื่องชั่ง: ก่อน 120.0 g</div>
+            </button>
+          </div>`;
+
+      dom.container.innerHTML = `
+        <div class="space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <span class="px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/40 text-cyan-300 text-xs font-bold">ด่านที่ 1/5 • ข้อที่ ${state.subStep + 1}/${totalQ}</span>
+            <span class="text-xs text-slate-400 font-semibold">ตัวชี้วัด ${q.code}</span>
+          </div>
+
+          <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+            <div class="h-full bg-gradient-to-r from-cyan-400 to-sky-500 transition-all duration-300" style="width: ${pct}%"></div>
+          </div>
+
+          <h2 class="text-xl sm:text-2xl font-bold text-white">${q.title}</h2>
+          ${labWidget}
+
+          <div class="space-y-2.5">
+            <p class="text-sm font-semibold text-cyan-200 leading-relaxed">${q.prompt}</p>
+            <div class="grid gap-2.5">
+              ${q.options.map((opt, idx) => `
+                <button type="button" data-idx="${idx}" class="s1-opt btn-option text-left p-3.5 rounded-xl text-sm">${opt.text}</button>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+
+      if (q.mode === 'atom') {
+        drawAtomCanvas(false);
+        document.getElementById('btnPlayAtomAnim').addEventListener('click', () => {
+          SoundFX.click();
+          drawAtomCanvas(true);
+        });
+      } else {
+        document.getElementById('btnClosedSys').addEventListener('click', () => {
+          SoundFX.click();
+          document.getElementById('scaleClosed').innerHTML = '⚖️ มวลหลังปฏิกิริยา = <strong class="text-emerald-300">120.0 กรัม</strong> (แก๊สถูกกักไว้ในขวด)';
+        });
+        document.getElementById('btnOpenSys').addEventListener('click', () => {
+          SoundFX.click();
+          document.getElementById('scaleOpen').innerHTML = '⚖️ มวลหลังปฏิกิริยา = <strong class="text-amber-300">116.5 กรัม</strong> (แก๊ส 3.5 กรัม หนีสู่อากาศ)';
+        });
+      }
+
+      document.querySelectorAll('.s1-opt').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const opt = q.options[Number(btn.dataset.idx)];
+          if (opt.ok) {
+            if (state.subStep < totalQ - 1) {
+              handleAnswer(true, q.feedbackOk, () => {
+                if (q.code.includes('ม.3/3')) markMastered(['ว 2.1 ม.3/3']);
+                if (q.code.includes('ม.3/4')) markMastered(['ว 2.1 ม.3/4']);
+                state.subStep += 1;
+                render();
+              });
+            } else {
+              SoundFX.stageClear();
+              handleAnswer(true, q.feedbackOk, () => {
+                markMastered(['ว 2.1 ม.3/3', 'ว 2.1 ม.3/4']);
+                unlockCodex(1);
+                state.stage = 2;
+                state.subStep = 0;
+                state.stage2Temp = 28;
+                render();
+              });
+            }
+          } else {
+            handleAnswer(false, q.feedbackBad);
+          }
+        });
+      });
+    }
+
+    function drawAtomCanvas(animate) {
+      const canvas = document.getElementById('atomCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      let progress = animate ? 0 : 1;
+
+      function frame() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.font = 'bold 13px "Noto Sans Thai", Inter, sans-serif';
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText('สารตั้งต้น: 2 H₂ + O₂', 28, 24);
+        ctx.fillText('ผลิตภัณฑ์: 2 H₂O (น้ำ)', 285, 24);
+
+        // Arrow
+        ctx.strokeStyle = '#00e5ff';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(205, 78);
+        ctx.lineTo(250, 78);
+        ctx.lineTo(240, 70);
+        ctx.moveTo(250, 78);
+        ctx.lineTo(240, 86);
+        ctx.stroke();
+
+        // Reactants (left)
+        const drawAtom = (x, y, r, color, label) => {
+          ctx.beginPath();
+          ctx.arc(x, y, r, 0, Math.PI * 2);
+          ctx.fillStyle = color;
+          ctx.fill();
+          ctx.strokeStyle = '#0b162c';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.fillStyle = '#050b18';
+          ctx.font = 'bold 11px Inter, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(label, x, y);
+          ctx.textAlign = 'start';
+          ctx.textBaseline = 'alphabetic';
+        };
+
+        // H2 #1, H2 #2, O2
+        drawAtom(52, 58, 11, '#38bdf8', 'H');
+        drawAtom(74, 58, 11, '#38bdf8', 'H');
+        drawAtom(52, 98, 11, '#38bdf8', 'H');
+        drawAtom(74, 98, 11, '#38bdf8', 'H');
+        drawAtom(140, 78, 16, '#fb7185', 'O');
+        drawAtom(170, 78, 16, '#fb7185', 'O');
+
+        // Products (right) interpolated if animating
+        const t = animate ? Math.min(1, progress) : 1;
+        const offset = (1 - t) * -60;
+        // H2O #1
+        drawAtom(325 + offset, 60, 16, '#fb7185', 'O');
+        drawAtom(304 + offset, 72, 11, '#38bdf8', 'H');
+        drawAtom(346 + offset, 72, 11, '#38bdf8', 'H');
+        // H2O #2
+        drawAtom(405 + offset, 95, 16, '#fb7185', 'O');
+        drawAtom(384 + offset, 107, 11, '#38bdf8', 'H');
+        drawAtom(426 + offset, 107, 11, '#38bdf8', 'H');
+
+        if (animate && progress < 1) {
+          progress += 0.04;
+          requestAnimationFrame(frame);
+        }
+      }
+      frame();
+    }
+
+    // --- STAGE 2: Endothermic & Exothermic Reactions (10 Questions) ---
+    const STAGE2_QUESTIONS = [
+      {
+        title: 'หลักการปฏิกิริยาดูดความร้อน',
+        prompt: 'เมื่อเกิดปฏิกิริยาดูดความร้อน (Endothermic) สิ่งแวดล้อมรอบข้างภาชนะทดลองจะเปลี่ยนแปลงอย่างไร?',
+        tempResult: 14,
+        options: [
+          { text: 'A. อุณหภูมิของสิ่งแวดล้อมลดต่ำลง', ok: true },
+          { text: 'B. อุณหภูมิของสิ่งแวดล้อมพุ่งสูงขึ้นอย่างรวดเร็ว', ok: false },
+          { text: 'C. สารละลายเกิดแสงสว่างและปล่อยความร้อนออกมา', ok: false },
+          { text: 'D. อุณหภูมิคงที่ตลอดเวลาแม้ปฏิกิริยาจะดำเนินไป', ok: false }
+        ],
+        feedbackOk: '❄️ ถูกต้อง! ปฏิกิริยาดูดความร้อนจะดูดพลังงานจากสิ่งแวดล้อม ทำให้อุณหภูมิรอบข้างลดลง',
+        feedbackBad: 'ยังไม่ถูก: ปฏิกิริยาดูดความร้อนดึงความร้อนจากรอบข้างเข้าไป จึงรู้สึกเย็นลง'
+      },
+      {
+        title: 'หลักการปฏิกิริยาคายความร้อน',
+        prompt: 'ข้อใดอธิบายการถ่ายโอนพลังงานของปฏิกิริยาคายความร้อน (Exothermic) ได้ถูกต้อง?',
+        tempResult: 62,
+        options: [
+          { text: 'A. ระบบดูดพลังงานจากเทอร์โมมิเตอร์ทำให้ปรอทลดลง', ok: false },
+          { text: 'B. ไม่มีการถ่ายโอนพลังงานความร้อนระหว่างระบบกับสิ่งแวดล้อม', ok: false },
+          { text: 'C. ระบบปล่อยพลังงานความร้อนออกสู่สิ่งแวดล้อมรอบข้าง', ok: true },
+          { text: 'D. ระบบเปลี่ยนพลังงานความร้อนทั้งหมดเป็นมวลของสารตั้งต้น', ok: false }
+        ],
+        feedbackOk: '🔥 ถูกต้อง! ปฏิกิริยาคายความร้อนปล่อยความร้อนออกมา ทำให้อุณหภูมิสิ่งแวดล้อมสูงขึ้น',
+        feedbackBad: 'ยังไม่ถูก: คายความร้อนคือการปล่อยพลังงานความร้อนจากระบบออกสู่สิ่งแวดล้อม'
+      },
+      {
+        title: 'ภารกิจถุงประคบเย็นฉุกเฉิน',
+        prompt: 'หากต้องการผลิตถุงประคบเย็นสำหรับปฐมพยาบาลนักกีฬา ควรเลือกคู่สารใด?',
+        tempResult: 12,
+        options: [
+          { text: 'A. ผงเหล็กผสมแก๊สออกซิเจนเพื่อให้เกิดความอุ่น', ok: false },
+          { text: 'B. แอมโมเนียมไนเตรตผสมน้ำ (ดูดความร้อน)', ok: true },
+          { text: 'C. แคลเซียมออกไซด์ผสมน้ำเพื่อให้เกิดความร้อนสูง', ok: false },
+          { text: 'D. น้ำมันเชื้อเพลิงเผาไหม้กับแก๊สออกซิเจนในอากาศ', ok: false }
+        ],
+        feedbackOk: '❄️ เยี่ยม! แอมโมเนียมไนเตรตละลายน้ำเป็นกระบวนการดูดความร้อน ทำให้อุณหภูมิลดลง',
+        feedbackBad: 'ถุงประคบเย็นต้องใช้ปฏิกิริยาดูดความร้อนเพื่อลดอุณหภูมิครับ'
+      },
+      {
+        title: 'ภารกิจอุปกรณ์อุ่นอาหารพกพา',
+        prompt: 'ซองทำความร้อนในชุดอาหารพกพา (Self-heating meal) อาศัยหลักการใดในการทำให้น้ำเดือด?',
+        tempResult: 68,
+        options: [
+          { text: 'A. การดูดความร้อนจากอาหารเข้าสู่ซองสารเคมี', ok: false },
+          { text: 'B. การเปลี่ยนสถานะของน้ำแข็งแห้งเป็นแก๊ส', ok: false },
+          { text: 'C. การละลายของเกลือแกงในน้ำเย็นจัด', ok: false },
+          { text: 'D. ปฏิกิริยาคายความร้อนของสารในซองกับน้ำ', ok: true }
+        ],
+        feedbackOk: '🔥 ถูกต้อง! ปฏิกิริยาคายความร้อนปล่อยพลังงานออกมาต้มน้ำและอุ่นอาหารได้',
+        feedbackBad: 'การทำให้อาหารร้อนขึ้นต้องอาศัยปฏิกิริยาที่คายพลังงานความร้อนออกมาครับ'
+      },
+      {
+        title: 'การอ่านค่าเทอร์โมมิเตอร์ในห้องแล็บ',
+        prompt: 'เริ่มต้นน้ำในบีกเกอร์มีอุณหภูมิ 28°C เมื่อเติมสาร X ลงไป อุณหภูมิเปลี่ยนเป็น 45°C ปฏิกิริยานี้เป็นแบบใด?',
+        tempResult: 45,
+        options: [
+          { text: 'A. ปฏิกิริยาคายความร้อน', ok: true },
+          { text: 'B. ปฏิกิริยาดูดความร้อนจากน้ำเข้าสู่สาร X', ok: false },
+          { text: 'C. ปฏิกิริยาสะเทินที่ไม่ถ่ายโอนความร้อนเลย', ok: false },
+          { text: 'D. การเปลี่ยนแปลงทางกายภาพที่ดูดพลังงานแสง', ok: false }
+        ],
+        feedbackOk: '🔥 ถูกต้อง! อุณหภูมิเพิ่มขึ้นจาก 28°C เป็น 45°C แสดงว่ามีการคายความร้อนออกสู่สารละลาย',
+        feedbackBad: 'สังเกตตัวเลข: อุณหภูมิสูงขึ้นแปลว่าปฏิกิริยาปล่อยความร้อนออกมา (คายความร้อน)'
+      },
+      {
+        title: 'ปฏิกิริยาระหว่างน้ำส้มสายชูกับเบกกิ้งโซดา',
+        prompt: 'เมื่อผสมน้ำส้มสายชูกับเบกกิ้งโซดาแล้วจับข้างบีกเกอร์จะรู้สึกเย็นลง แสดงว่าเกิดปฏิกิริยาแบบใด?',
+        tempResult: 19,
+        options: [
+          { text: 'A. คายความร้อนเพราะเกิดฟองแก๊สจำนวนมาก', ok: false },
+          { text: 'B. ดูดความร้อนจากสิ่งแวดล้อม', ok: true },
+          { text: 'C. คายความร้อนออกสู่มือของผู้ทดลอง', ok: false },
+          { text: 'D. ไม่มีการเปลี่ยนแปลงพลังงานความร้อน', ok: false }
+        ],
+        feedbackOk: '❄️ ถูกต้อง! เมื่อสัมผัสภาชนะแล้วรู้สึกเย็นลง แสดงว่าระบบดูดความร้อนจากสิ่งแวดล้อม',
+        feedbackBad: 'จำง่ายๆ: จับแล้วรู้สึกเย็นลง = ดูดความร้อน | จับแล้วรู้สึกร้อนขึ้น = คายความร้อน'
+      },
+      {
+        title: 'เปรียบเทียบพลังงานของสารตั้งต้นและผลิตภัณฑ์',
+        prompt: 'ในปฏิกิริยาดูดความร้อน พลังงานของสารตั้งต้นเทียบกับผลิตภัณฑ์เป็นอย่างไร?',
+        tempResult: 18,
+        options: [
+          { text: 'A. สารตั้งต้นมีพลังงานสูงกว่าผลิตภัณฑ์มาก', ok: false },
+          { text: 'B. สารตั้งต้นและผลิตภัณฑ์มีพลังงานเท่ากันพอดี', ok: false },
+          { text: 'C. ผลิตภัณฑ์มีพลังงานสูงกว่าสารตั้งต้น', ok: true },
+          { text: 'D. ผลิตภัณฑ์ไม่มีพลังงานสะสมหลงเหลืออยู่เลย', ok: false }
+        ],
+        feedbackOk: '✅ ถูกต้อง! ระบบดูดพลังงานเข้าไปสะสม ทำให้ผลิตภัณฑ์มีพลังงานสูงกว่าสารตั้งต้น',
+        feedbackBad: 'ในปฏิกิริยาดูดความร้อน สารดูดพลังงานเข้าไปเพิ่ม ดังนั้นผลิตภัณฑ์จึงมีพลังงานสูงกว่า'
+      },
+      {
+        title: 'ปฏิกิริยาการสังเคราะห์ด้วยแสงของพืช',
+        prompt: 'การสังเคราะห์ด้วยแสงที่พืชดูดพลังงานแสงมาใช้สร้างน้ำตาลกลูโคส จัดเป็นกระบวนการใด?',
+        tempResult: 24,
+        options: [
+          { text: 'A. กระบวนการคายความร้อนสูงสู่อากาศ', ok: false },
+          { text: 'B. กระบวนการที่ไม่เกี่ยวข้องกับพลังงาน', ok: false },
+          { text: 'C. การเผาไหม้สมบูรณ์ภายในคลอโรพลาสต์', ok: false },
+          { text: 'D. กระบวนการดูดพลังงาน (ดูดความร้อน)', ok: true }
+        ],
+        feedbackOk: '🌱 ถูกต้อง! การสังเคราะห์ด้วยแสงต้องรับพลังงานจากภายนอก จึงเป็นกระบวนการดูดพลังงาน',
+        feedbackBad: 'พืชต้องดูดกลืนพลังงานแสงเข้าไปเพื่อสร้างอาหาร จึงจัดเป็นกระบวนการดูดพลังงานครับ'
+      },
+      {
+        title: 'ปฏิกิริยาการเผาไหม้และหายใจระดับเซลล์',
+        prompt: 'การจุดเทียนไขและการสลายกลูโคสในเซลล์เพื่อสร้างความอบอุ่นแก่ร่างกาย จัดเป็นปฏิกิริยาใด?',
+        tempResult: 58,
+        options: [
+          { text: 'A. ปฏิกิริยาดูดความร้อนทั้งหมด', ok: false },
+          { text: 'B. ปฏิกิริยาคายความร้อน', ok: true },
+          { text: 'C. การเปลี่ยนสถานะจากของแข็งเป็นแก๊สเท่านั้น', ok: false },
+          { text: 'D. ปฏิกิริยาสะเทินระหว่างกรดกับโลหะ', ok: false }
+        ],
+        feedbackOk: '🔥 ถูกต้อง! ทั้งการเผาไหม้และการหายใจระดับเซลล์ต่างปล่อยพลังงานออกมา (คายความร้อน)',
+        feedbackBad: 'ทั้งสองกระบวนการให้พลังงานความร้อนออกมา จึงเป็นปฏิกิริยาคายความร้อนครับ'
+      },
+      {
+        title: 'วิเคราะห์ผลทดลองจากตารางอุณหภูมิ',
+        prompt: 'สาร A+B ทำให้อุณหภูมิลดจาก 28°C เหลือ 16°C ส่วนสาร C+D เพิ่มจาก 28°C เป็น 54°C ข้อใดสรุปถูก?',
+        tempResult: 54,
+        options: [
+          { text: 'A. A+B ดูดความร้อน ส่วน C+D คายความร้อน', ok: true },
+          { text: 'B. A+B คายความร้อน ส่วน C+D ดูดความร้อน', ok: false },
+          { text: 'C. ทั้งสองปฏิกิริยาเป็นแบบดูดความร้อนเหมือนกัน', ok: false },
+          { text: 'D. ทั้งสองปฏิกิริยาเป็นแบบคายความร้อนเหมือนกัน', ok: false }
+        ],
+        feedbackOk: '🎉 ผ่านด่านที่ 2 ครบ 10 ข้อ! วิเคราะห์การถ่ายโอนความร้อนของปฏิกิริยาได้แม่นยำ',
+        feedbackBad: 'ดูทิศทางอุณหภูมิ: 28→16°C (ลดลง = ดูด), 28→54°C (เพิ่มขึ้น = คาย)'
+      }
+    ];
+
+    function renderStage2() {
+      const q = STAGE2_QUESTIONS[state.subStep];
+      const totalQ = STAGE2_QUESTIONS.length;
+      const pct = Math.round(((state.subStep + 1) / totalQ) * 100);
+
+      dom.container.innerHTML = `
+        <div class="space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <span class="px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/40 text-cyan-300 text-xs font-bold">ด่านที่ 2/5 • ข้อที่ ${state.subStep + 1}/${totalQ}</span>
+            <span class="text-xs text-slate-400 font-semibold">ตัวชี้วัด ว 2.1 ม.3/5</span>
+          </div>
+
+          <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+            <div class="h-full bg-gradient-to-r from-cyan-400 to-sky-500 transition-all duration-300" style="width: ${pct}%"></div>
+          </div>
+
+          <h2 class="text-xl sm:text-2xl font-bold text-white">${q.title}</h2>
+
+          <div class="rounded-xl bg-[#060f21] border border-cyan-500/30 p-4 flex flex-col sm:flex-row items-center justify-around gap-4">
+            <canvas id="thermoCanvas" width="220" height="140" class="max-w-full h-auto"></canvas>
+            <div class="text-center sm:text-left space-y-1">
+              <div class="text-xs text-slate-400">เทอร์โมมิเตอร์ห้องทดลอง</div>
+              <div id="tempDisplay" class="text-3xl font-extrabold text-cyan-300">${state.stage2Temp}°C</div>
+              <div class="text-xs text-slate-400">อุณหภูมิอ้างอิง 28°C</div>
+            </div>
+          </div>
+
+          <div class="space-y-2.5">
+            <p class="text-sm font-semibold text-cyan-200 leading-relaxed">${q.prompt}</p>
+            <div class="grid gap-2.5">
+              ${q.options.map((opt, idx) => `
+                <button type="button" data-idx="${idx}" class="s2-opt btn-option text-left p-3.5 rounded-xl text-sm">${opt.text}</button>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+
+      drawThermoCanvas(state.stage2Temp);
+      document.querySelectorAll('.s2-opt').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const opt = q.options[Number(btn.dataset.idx)];
+          if (opt.ok) {
+            state.stage2Temp = q.tempResult;
+            drawThermoCanvas(state.stage2Temp);
+            document.getElementById('tempDisplay').textContent = `${state.stage2Temp}°C`;
+            if (state.subStep < totalQ - 1) {
+              handleAnswer(true, q.feedbackOk, () => {
+                state.subStep += 1;
+                state.stage2Temp = 28;
+                setTimeout(render, 550);
+              });
+            } else {
+              SoundFX.stageClear();
+              handleAnswer(true, q.feedbackOk, () => {
+                markMastered(['ว 2.1 ม.3/5']);
+                unlockCodex(2);
+                state.stage = 3;
+                state.subStep = 0;
+                setTimeout(render, 550);
+              });
+            }
+          } else {
+            handleAnswer(false, q.feedbackBad);
+          }
+        });
+      });
+    }
+
+    function drawThermoCanvas(temp) {
+      const canvas = document.getElementById('thermoCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = '#0f172a';
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(24, 50, 172, 28, 14);
+      ctx.fill();
+      ctx.stroke();
+
+      const ratio = Math.max(0.08, Math.min(1, temp / 80));
+      const grad = ctx.createLinearGradient(24, 0, 196, 0);
+      grad.addColorStop(0, '#00e5ff');
+      grad.addColorStop(0.5, '#34d399');
+      grad.addColorStop(1, '#f43f5e');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.roundRect(28, 54, 164 * ratio, 20, 10);
+      ctx.fill();
+
+      ctx.fillStyle = '#cbd5e1';
+      ctx.font = 'bold 12px Inter, sans-serif';
+      ctx.fillText('0°C', 24, 100);
+      ctx.fillText('28°C', 85, 100);
+      ctx.fillText('80°C', 165, 100);
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillText(temp < 25 ? '❄️ ENDOTHERMIC' : temp > 35 ? '🔥 EXOTHERMIC' : '🌡️ NORMAL', 55, 32);
+    }
+
+    // --- STAGE 3: Acid-Base, Metal, Rusting, Environmental Reactions (10 Questions) ---
+    const STAGE3_QUESTIONS = [
+      {
+        title: 'ปฏิกิริยาสะเทินของกรดกับเบส',
+        prompt: 'เมื่อสารละลายกรดทำปฏิกิริยากับสารละลายเบส ผลิตภัณฑ์หลักที่เกิดขึ้นเสมอคือข้อใด?',
+        options: [
+          { text: 'A. แก๊สไฮโดรเจนและโลหะบริสุทธิ์', ok: false },
+          { text: 'B. เกลือและน้ำ', ok: true },
+          { text: 'C. สนิมเหล็กและแก๊สคาร์บอนไดออกไซด์', ok: false },
+          { text: 'D. น้ำตาลกลูโคสและแก๊สออกซิเจน', ok: false }
+        ],
+        feedbackOk: '✅ ถูกต้อง! กรด + เบส → เกลือ + น้ำ (ปฏิกิริยาสะเทิน)',
+        feedbackBad: 'ยังไม่ถูก: กรดทำปฏิกิริยากับเบสจะได้ผลิตภัณฑ์เป็นเกลือและน้ำครับ'
+      },
+      {
+        title: 'การแก้ปัญหาดินเปรี้ยวในการเกษตร',
+        prompt: 'ดินในสวนผลไม้มีสภาพเป็นกรดจัด เกษตรกรควรเติมสารใดเพื่อปรับค่า pH ของดินให้เป็นกลาง?',
+        options: [
+          { text: 'A. ปูนขาว (เบส)', ok: true },
+          { text: 'B. น้ำส้มสายชูเข้มข้นสำหรับปรุงอาหาร', ok: false },
+          { text: 'C. น้ำอัดลมที่มีแก๊สคาร์บอนไดออกไซด์ละลายอยู่', ok: false },
+          { text: 'D. กรดซัลฟิวริกเจือจางเพื่อเร่งปฏิกิริยาในดิน', ok: false }
+        ],
+        feedbackOk: '✅ ถูกต้อง! ปูนขาวมีสมบัติเป็นเบส ช่วยสะเทินกรดในดินเปรี้ยวได้',
+        feedbackBad: 'ดินเปรี้ยวมีฤทธิ์เป็นกรด จึงต้องแก้ด้วยสารที่มีสมบัติเป็นเบสครับ'
+      },
+      {
+        title: 'ปฏิกิริยาของกรดกับโลหะ',
+        prompt: 'เมื่อหยดกรดไฮโดรคลอริกลงบนแผ่นสังกะสี จะเกิดฟองแก๊สชนิดใดพวยพุ่งขึ้นมา?',
+        options: [
+          { text: 'A. แก๊สออกซิเจนที่ช่วยให้ไฟติดสว่าง', ok: false },
+          { text: 'B. แก๊สไนโตรเจนซึ่งเป็นแก๊สเฉื่อยในอากาศ', ok: false },
+          { text: 'C. แก๊สไฮโดรเจน', ok: true },
+          { text: 'D. แก๊สซัลเฟอร์ไดออกไซด์ที่มีกลิ่นฉุนรุนแรง', ok: false }
+        ],
+        feedbackOk: '✅ ถูกต้อง! กรด + โลหะ → เกลือของโลหะ + แก๊สไฮโดรเจน',
+        feedbackBad: 'ทบทวนสมการ: กรดทำปฏิกิริยากับโลหะจะได้เกลือของโลหะและแก๊สไฮโดรเจนครับ'
+      },
+      {
+        title: 'ปฏิกิริยาของเบสกับโลหะบางชนิด',
+        prompt: 'เหตุใดจึงไม่ควรต้มหรือเก็บสารละลายเบสแก่ (เช่น โซดาไฟ) ในภาชนะที่ทำจากอะลูมิเนียม?',
+        options: [
+          { text: 'A. เพราะอะลูมิเนียมจะเปลี่ยนเบสให้กลายเป็นกรดเข้มข้น', ok: false },
+          { text: 'B. เพราะอะลูมิเนียมไม่นำความร้อนทำให้สารไม่เดือด', ok: false },
+          { text: 'C. เพราะเบสจะแข็งตัวติดก้นภาชนะจนล้างไม่ออก', ok: false },
+          { text: 'D. เพราะเบสกัดกร่อนอะลูมิเนียมเกิดแก๊สไฮโดรเจน', ok: true }
+        ],
+        feedbackOk: '✅ ถูกต้อง! เบสสามารถทำปฏิกิริยากับโลหะบางชนิดเช่นอะลูมิเนียมและสังกะสีได้',
+        feedbackBad: 'โลหะบางชนิดอย่างอะลูมิเนียมสามารถถูกเบสกัดกร่อนและเกิดแก๊สไฮโดรเจนได้ครับ'
+      },
+      {
+        title: 'ปัจจัยที่ทำให้เกิดสนิมเหล็ก',
+        prompt: 'ข้อใดคือสมการข้อความที่แสดงปัจจัยครบถ้วนของการเกิดสนิมเหล็ก?',
+        options: [
+          { text: 'A. เหล็ก + แก๊สออกซิเจน + น้ำ → สนิมเหล็ก', ok: true },
+          { text: 'B. เหล็ก + แก๊สคาร์บอนไดออกไซด์ + แสงแดด → สนิมเหล็ก', ok: false },
+          { text: 'C. เหล็ก + แก๊สไนโตรเจน + ความร้อนสูง → สนิมเหล็ก', ok: false },
+          { text: 'D. เหล็ก + น้ำกลั่นบริสุทธิ์ในสุญญากาศ → สนิมเหล็ก', ok: false }
+        ],
+        feedbackOk: '✅ ถูกต้อง! การเกิดสนิมเหล็กต้องมีทั้งเหล็ก ออกซิเจน และน้ำ (ความชื้น)',
+        feedbackBad: 'การเกิดสนิมเหล็กต้องอาศัยทั้งออกซิเจนและน้ำร่วมกันครับ'
+      },
+      {
+        title: 'วิธีป้องกันการเกิดสนิมเหล็ก',
+        prompt: 'วิธีใดช่วยป้องกันรั้วเหล็กไม่ให้เกิดสนิมได้ผลดีที่สุด?',
+        options: [
+          { text: 'A. ล้างรั้วเหล็กด้วยน้ำเกลือเป็นประจำทุกสัปดาห์', ok: false },
+          { text: 'B. ทาสีกันสนิมหรือชุบสังกะสีเคลือบผิวเหล็ก', ok: true },
+          { text: 'C. วางรั้วเหล็กไว้ในที่ชื้นแฉะและมีอากาศถ่ายเท', ok: false },
+          { text: 'D. ขัดผิวเหล็กให้เรียบแล้วแช่น้ำไว้ตลอดเวลา', ok: false }
+        ],
+        feedbackOk: '✅ ถูกต้อง! การทาสีหรือเคลือบโลหะช่วยกันไม่ให้เหล็กสัมผัสน้ำและออกซิเจน',
+        feedbackBad: 'หลักการป้องกันสนิมคือป้องกันไม่ให้เหล็กสัมผัสกับน้ำและออกซิเจนครับ'
+      },
+      {
+        title: 'การเผาไหม้สมบูรณ์ vs ไม่สมบูรณ์',
+        prompt: 'เมื่อเชื้อเพลิงเผาไหม้ในบริเวณที่มีแก๊สออกซิเจนไม่เพียงพอ (เผาไหม้ไม่สมบูรณ์) จะเกิดแก๊สพิษใด?',
+        options: [
+          { text: 'A. แก๊สออกซิเจนบริสุทธิ์จำนวนมาก', ok: false },
+          { text: 'B. แก๊สไนโตรเจนที่ไม่เป็นอันตรายต่อร่างกาย', ok: false },
+          { text: 'C. แก๊สคาร์บอนมอนอกไซด์และเขม่าควัน', ok: true },
+          { text: 'D. แก๊สไฮโดรเจนที่เบากว่าอากาศรอบตัว', ok: false }
+        ],
+        feedbackOk: '✅ ถูกต้อง! การเผาไหม้ไม่สมบูรณ์ก่อให้เกิดแก๊สคาร์บอนมอนอกไซด์ (CO) และเขม่า',
+        feedbackBad: 'ออกซิเจนไม่พอทำให้เกิดการเผาไหม้ไม่สมบูรณ์ ได้แก๊สพิษคาร์บอนมอนอกไซด์ครับ'
+      },
+      {
+        title: 'การเกิดฝนกรด (Acid Rain)',
+        prompt: 'แก๊สมลพิษหลักจากโรงไฟฟ้าถ่านหินและไอเสียรถยนต์ที่ทำปฏิกิริยากับน้ำฝนจนเกิดฝนกรดคือข้อใด?',
+        options: [
+          { text: 'A. แก๊สออกซิเจนและแก๊สฮีเลียมในชั้นบรรยากาศ', ok: false },
+          { text: 'B. แก๊สไฮโดรเจนและไอน้ำบริสุทธิ์จากทะเล', ok: false },
+          { text: 'C. แก๊สมีเทนจากนาข้าวและฟาร์มปศุสัตว์', ok: false },
+          { text: 'D. แก๊สซัลเฟอร์ไดออกไซด์และออกไซด์ของไนโตรเจน', ok: true }
+        ],
+        feedbackOk: '✅ ถูกต้อง! SO₂ และ NOₓ รวมตัวกับน้ำในอากาศกลายเป็นกรดตกลงมาเป็นฝนกรด',
+        feedbackBad: 'ฝนกรดเกิดจากแก๊สซัลเฟอร์ไดออกไซด์และออกไซด์ของไนโตรเจนรวมตัวกับน้ำครับ'
+      },
+      {
+        title: 'สมการข้อความของการสังเคราะห์ด้วยแสง',
+        prompt: 'ข้อใดเขียนสมการข้อความของการสังเคราะห์ด้วยแสงได้ถูกต้อง?',
+        options: [
+          { text: 'A. แก๊สคาร์บอนไดออกไซด์ + น้ำ → น้ำตาลกลูโคส + แก๊สออกซิเจน', ok: true },
+          { text: 'B. น้ำตาลกลูโคส + แก๊สออกซิเจน → แก๊สคาร์บอนไดออกไซด์ + น้ำ', ok: false },
+          { text: 'C. แก๊สออกซิเจน + น้ำ + แร่ธาตุ → แป้ง + แก๊สไนโตรเจน', ok: false },
+          { text: 'D. แก๊สคาร์บอนมอนอกไซด์ + ดิน → คลอโรฟิลล์ + น้ำ', ok: false }
+        ],
+        feedbackOk: '🌱 ถูกต้อง! พืชใช้ CO₂ และน้ำ โดยมีแสงและคลอโรฟิลล์สร้างกลูโคสและ O₂',
+        feedbackBad: 'พืชดูดแก๊สคาร์บอนไดออกไซด์และน้ำเป็นสารตั้งต้น แล้วปล่อยแก๊สออกซิเจนออกมาครับ'
+      },
+      {
+        title: 'การแก้ปัญหาอาการกรดไหลย้อน/แสบท้อง',
+        prompt: 'ยาลดกรดในกระเพาะอาหารทำงานโดยอาศัยปฏิกิริยาเคมีชนิดใด?',
+        options: [
+          { text: 'A. ปฏิกิริยาการเกิดสนิมของโลหะ', ok: false },
+          { text: 'B. ปฏิกิริยาสะเทินระหว่างกรดกับเบส', ok: true },
+          { text: 'C. ปฏิกิริยาการเผาไหม้สารอาหาร', ok: false },
+          { text: 'D. ปฏิกิริยาการสังเคราะห์ด้วยแสง', ok: false }
+        ],
+        feedbackOk: '🎉 ผ่านด่านที่ 3 ครบ 10 ข้อ! ยาลดกรดมีฤทธิ์เป็นเบสอ่อนช่วยสะเทินกรดส่วนเกิน',
+        feedbackBad: 'ยาลดกรดใช้เบสอ่อนเข้าไปทำปฏิกิริยาสะเทินกับกรดไฮโดรคลอริกในกระเพาะครับ'
+      }
+    ];
+
+    function renderStage3() {
+      const q = STAGE3_QUESTIONS[state.subStep];
+      const totalQ = STAGE3_QUESTIONS.length;
+      const pct = Math.round(((state.subStep + 1) / totalQ) * 100);
+
+      dom.container.innerHTML = `
+        <div class="space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <span class="px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/40 text-cyan-300 text-xs font-bold">ด่านที่ 3/5 • ข้อที่ ${state.subStep + 1}/${totalQ}</span>
+            <span class="text-xs text-slate-400 font-semibold">ตัวชี้วัด ว 2.1 ม.3/6</span>
+          </div>
+
+          <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+            <div class="h-full bg-gradient-to-r from-cyan-400 to-sky-500 transition-all duration-300" style="width: ${pct}%"></div>
+          </div>
+
+          <h2 class="text-xl sm:text-2xl font-bold text-white">${q.title}</h2>
+          <div class="p-4 rounded-xl bg-[#071124] border border-cyan-500/25 text-sm text-slate-200 leading-relaxed">
+            🧪 ${q.prompt}
+          </div>
+          <div class="grid gap-2.5">
+            ${q.options.map((opt, idx) => `
+              <button type="button" data-idx="${idx}" class="s3-opt btn-option text-left p-3.5 rounded-xl text-sm">${opt.text}</button>
+            `).join('')}
+          </div>
+        </div>
+      `;
+
+      document.querySelectorAll('.s3-opt').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const opt = q.options[Number(btn.dataset.idx)];
+          if (opt.ok) {
+            if (state.subStep < totalQ - 1) {
+              handleAnswer(true, q.feedbackOk, () => {
+                state.subStep += 1;
+                render();
+              });
+            } else {
+              SoundFX.stageClear();
+              handleAnswer(true, q.feedbackOk, () => {
+                markMastered(['ว 2.1 ม.3/6']);
+                unlockCodex(3);
+                state.stage = 4;
+                state.subStep = 0;
+                render();
+              });
+            }
+          } else {
+            handleAnswer(false, q.feedbackBad);
+          }
+        });
+      });
+    }
+
+    // --- STAGE 4: Polymers, Ceramics, Metals, Composites & Eco-Use (10 Questions) ---
+    const STAGE4_QUESTIONS = [
+      {
+        code: 'ว 2.1 ม.3/1',
+        title: 'กลุ่มของพอลิเมอร์ในชีวิตประจำวัน',
+        prompt: 'ของใช้ในชีวิตประจำวันที่ทำจากพอลิเมอร์แบ่งออกเป็น 3 กลุ่มหลักตามหนังสือ สสวท. คือข้อใด?',
+        options: [
+          { text: 'A. พลาสติก ยาง และเส้นใย', ok: true },
+          { text: 'B. ดินเหนียว หินปูน และทรายแก้ว', ok: false },
+          { text: 'C. เหล็ก ทองแดง และอะลูมิเนียม', ok: false },
+          { text: 'D. คอนกรีตเสริมเหล็ก ไฟเบอร์กลาส และกระจก', ok: false }
+        ],
+        feedbackOk: '✅ ถูกต้อง! พอลิเมอร์แบ่งเป็น พลาสติก ยาง และเส้นใย',
+        feedbackBad: 'ยังไม่ถูก: กลุ่มของใช้จากพอลิเมอร์ ได้แก่ พลาสติก ยาง และเส้นใยครับ'
+      },
+      {
+        code: 'ว 2.1 ม.3/1',
+        title: 'โครงสร้างพอลิเมอร์กับการรีไซเคิล',
+        prompt: 'พลาสติกที่มีโครงสร้างแบบใดเมื่อได้รับความร้อนจะอ่อนตัว หลอมเหลว และนำกลับมารีไซเคิลได้?',
+        options: [
+          { text: 'A. พอลิเมอร์แบบร่างแหที่เชื่อมโยงกันหนาแน่นทุกทิศทาง', ok: false },
+          { text: 'B. พอลิเมอร์แบบเส้นและแบบกิ่ง', ok: true },
+          { text: 'C. เซรามิกที่ผ่านการเผาด้วยอุณหภูมิสูงมาก', ok: false },
+          { text: 'D. พลาสติกประเภทเทอร์โมเซตติงทั้งหมด', ok: false }
+        ],
+        feedbackOk: '✅ ถูกต้อง! พอลิเมอร์แบบเส้นและแบบกิ่งจะอ่อนตัวเมื่อโดนความร้อน จึงรีไซเคิลได้',
+        feedbackBad: 'โครงสร้างแบบร่างแหจะไม่หลอมเหลวเมื่อโดนความร้อน จึงรีไซเคิลด้วยวิธีหลอมไม่ได้ครับ'
+      },
+      {
+        code: 'ว 2.1 ม.3/1',
+        title: 'สมบัติทางกายภาพของเซรามิก',
+        prompt: 'ข้อใดระบุสมบัติเด่นของวัสดุประเภทเซรามิกได้ถูกต้องที่สุด?',
+        options: [
+          { text: 'A. อ่อนตัวง่าย ยืดหยุ่นสูง และนำไฟฟ้าได้ดีเยี่ยม', ok: false },
+          { text: 'B. เหนียวมาก สามารถตีให้เป็นแผ่นบางหรือดึงเป็นเส้นลวดได้', ok: false },
+          { text: 'C. แข็งแต่เปราะ ทนความร้อนสูง และไม่นำไฟฟ้า', ok: true },
+          { text: 'D. น้ำหนักเบากว่าพอลิเมอร์และหลอมเหลวได้ในน้ำเดือด', ok: false }
+        ],
+        feedbackOk: '✅ ถูกต้อง! เซรามิกแข็งแต่เปราะ ทนความร้อนและทนการสึกกร่อนสูง เป็นฉนวนไฟฟ้า',
+        feedbackBad: 'สังเกตจากห้องทดสอบ: เซรามิกไม่นำไฟฟ้า ทนร้อนดี แต่เมื่อทุบจะแตกเปราะครับ'
+      },
+      {
+        code: 'ว 2.1 ม.3/1',
+        title: 'สมบัติและการใช้ประโยชน์ของโลหะ',
+        prompt: 'เหตุใดจึงนิยมใช้ทองแดงและอะลูมิเนียมมาทำสายไฟฟ้าและตัวหม้อหุงต้ม?',
+        options: [
+          { text: 'A. เพราะมีน้ำหนักเบามากและเปราะแตกง่ายเมื่อถูกกระแทก', ok: false },
+          { text: 'B. เพราะเป็นฉนวนไฟฟ้าที่ป้องกันไฟดูดได้ดีเยี่ยม', ok: false },
+          { text: 'C. เพราะไม่ทำปฏิกิริยากับสารใดๆ และไม่นำความร้อน', ok: false },
+          { text: 'D. เพราะนำไฟฟ้าและนำความร้อนได้ดีและเหนียว', ok: true }
+        ],
+        feedbackOk: '✅ ถูกต้อง! โลหะนำไฟฟ้าและความร้อนได้ดี เหนียว รีดเป็นแผ่นหรือยืดเป็นเส้นได้',
+        feedbackBad: 'สายไฟและภาชนะหุงต้มต้องการสมบัตินำไฟฟ้าและนำความร้อนได้ดีของโลหะครับ'
+      },
+      {
+        code: 'ว 2.1 ม.3/1',
+        title: 'การเลือกใช้วัสดุทำด้ามจับกระทะ',
+        prompt: 'วัสดุใดเหมาะทำ "ด้ามจับกระทะ" ที่ปลอดภัยจากความร้อนและไม่แตกง่ายเมื่อตกหล่น?',
+        options: [
+          { text: 'A. พอลิเมอร์แบบร่างแห (เทอร์โมเซตติง)', ok: true },
+          { text: 'B. โลหะทองแดงบริสุทธิ์ที่นำความร้อนสูง', ok: false },
+          { text: 'C. เซรามิกบางที่เปราะแตกง่ายเมื่อตกกระทบพื้น', ok: false },
+          { text: 'D. พลาสติกถุงเย็นที่อ่อนตัวและละลายในน้ำเดือด', ok: false }
+        ],
+        feedbackOk: '✅ ถูกต้อง! พอลิเมอร์แบบร่างแหเป็นฉนวนความร้อน ทนร้อนสูง และไม่เปราะแตก',
+        feedbackBad: 'ด้ามจับกระทะต้องทนร้อน ไม่นำความร้อน และไม่แตกง่ายเมื่อตกครับ'
+      },
+      {
+        code: 'ว 2.1 ม.3/1',
+        title: 'ความหมายของวัสดุผสม (Composite)',
+        prompt: 'จุดประสงค์หลักของการนำวัสดุตั้งแต่ 2 ชนิดขึ้นไปมารวมกันเป็น "วัสดุผสม" คืออะไร?',
+        options: [
+          { text: 'A. เพื่อลดความแข็งแรงของวัสดุตั้งต้นให้ย่อยสลายได้เร็วขึ้น', ok: false },
+          { text: 'B. เพื่อให้ได้วัสดุใหม่ที่มีสมบัติดีกว่าวัสดุเดิมและตรงตามงาน', ok: true },
+          { text: 'C. เพื่อเปลี่ยนพอลิเมอร์ทั้งหมดให้กลายเป็นโลหะบริสุทธิ์', ok: false },
+          { text: 'D. เพื่อให้วัสดุนำไฟฟ้าได้สูงขึ้นในทุกสถานการณ์', ok: false }
+        ],
+        feedbackOk: '✅ ถูกต้อง! วัสดุผสมรวมข้อดีของวัสดุแต่ละชนิดเพื่อให้ได้สมบัติที่ดีขึ้น',
+        feedbackBad: 'วัสดุผสมสร้างขึ้นเพื่อให้ได้สมบัติที่ดีกว่าวัสดุเดิมและเหมาะกับการใช้งานครับ'
+      },
+      {
+        code: 'ว 2.1 ม.3/1',
+        title: 'โครงสร้างของคอนกรีตเสริมเหล็ก',
+        prompt: 'ใน "คอนกรีตเสริมเหล็ก" หน้าที่ของคอนกรีตและเหล็กเส้นแตกต่างกันอย่างไร?',
+        options: [
+          { text: 'A. คอนกรีตช่วยรับแรงดึง ส่วนเหล็กเส้นช่วยป้องกันน้ำซึมเท่านั้น', ok: false },
+          { text: 'B. ทั้งคอนกรีตและเหล็กเส้นทำหน้าที่เป็นฉนวนกันความร้อนเหมือนกัน', ok: false },
+          { text: 'C. คอนกรีตรับแรงอัดได้ดี ส่วนเหล็กเส้นช่วยรับแรงดึง', ok: true },
+          { text: 'D. เหล็กเส้นมีไว้เพิ่มน้ำหนัก ส่วนคอนกรีตช่วยให้โครงสร้างยืดหยุ่น', ok: false }
+        ],
+        feedbackOk: '✅ ถูกต้อง! คอนกรีตทนแรงอัดสูง แต่รับแรงดึงน้อย จึงเสริมเหล็กเส้นที่ทนแรงดึงสูง',
+        feedbackBad: 'คอนกรีตรับแรงอัดได้ดี ส่วนเหล็กเส้นมีความเหนียวและรับแรงดึงได้สูงครับ'
+      },
+      {
+        code: 'ว 2.1 ม.3/1',
+        title: 'พลาสติกเสริมใยแก้ว (ไฟเบอร์กลาส)',
+        prompt: 'พลาสติกเสริมใยแก้วที่นิยมใช้ทำตัวถังเรือและหลังคารถยนต์ เกิดจากการรวมกันของวัสดุประเภทใด?',
+        options: [
+          { text: 'A. โลหะผสมกับยางธรรมชาติ', ok: false },
+          { text: 'B. พอลิเมอร์ผสมกับคอนกรีต', ok: false },
+          { text: 'C. เซรามิกผสมกับเส้นใยฝ้าย', ok: false },
+          { text: 'D. พอลิเมอร์ (พลาสติก) กับเซรามิก (ใยแก้ว)', ok: true }
+        ],
+        feedbackOk: '✅ ถูกต้อง! พลาสติกเป็นวัสดุหลักน้ำหนักเบา เสริมแรงด้วยใยแก้วซึ่งเป็นเซรามิก',
+        feedbackBad: 'ไฟเบอร์กลาสประกอบด้วยพลาสติก (พอลิเมอร์) และเส้นใยแก้ว (เซรามิก) ครับ'
+      },
+      {
+        code: 'ว 2.1 ม.3/1',
+        title: 'ยางเรเดียลรถยนต์',
+        prompt: 'เหตุใดยางรถยนต์จึงไม่ใช้ยางธรรมชาติเพียงอย่างเดียว แต่ใช้เป็นวัสดุผสม?',
+        options: [
+          { text: 'A. เพราะยางธรรมชาติเพียวๆ ฉีกขาดง่ายและเสื่อมสภาพเมื่อร้อน', ok: true },
+          { text: 'B. เพราะยางธรรมชาติไม่ยืดหยุ่นและแข็งเปราะเหมือนกระจก', ok: false },
+          { text: 'C. เพราะยางธรรมชาติมีราคาแพงกว่าเส้นลวดโลหะและคาร์บอน', ok: false },
+          { text: 'D. เพราะยางธรรมชาติสามารถนำไฟฟ้าได้สูงจนเป็นอันตราย', ok: false }
+        ],
+        feedbackOk: '✅ ถูกต้อง! จึงต้องเสริมผ้าใบพอลิเอสเทอร์และเส้นลวดโลหะให้ทนทานต่อแรงกระแทกและความร้อน',
+        feedbackBad: 'ยางธรรมชาติยืดหยุ่นดีแต่ฉีกขาดง่ายและไม่ทนความร้อนสูง จึงต้องพัฒนาเป็นวัสดุผสมครับ'
+      },
+      {
+        code: 'ว 2.1 ม.3/2',
+        title: 'การใช้วัสดุอย่างประหยัดและคุ้มค่า (Eco-Score)',
+        prompt: 'แนวทางใดช่วยลดปัญหาขยะพอลิเมอร์สังเคราะห์ที่ย่อยสลายยากได้อย่างคุ้มค่าที่สุด?',
+        ecoBonus: 50,
+        options: [
+          { text: 'A. เผาขยะพลาสติกในที่โล่งแจ้งเพื่อลดปริมาณขยะในถัง', ok: false },
+          { text: 'B. ใช้เท่าที่จำเป็น นำกลับมาใช้ซ้ำ และคัดแยกเพื่อรีไซเคิล', ok: true },
+          { text: 'C. เปลี่ยนมาใช้บรรจุภัณฑ์พลาสติกแบบใช้ครั้งเดียวทิ้งทุกมื้อ', ok: false },
+          { text: 'D. ฝังกลบขวดพลาสติกทั้งหมดไว้ใต้ดินโดยไม่คัดแยกประเภท', ok: false }
+        ],
+        feedbackOk: '🌱 ผ่านด่านที่ 4 ครบ 10 ข้อ! ได้รับ +50 Eco-Points จากการใช้ทรัพยากรอย่างคุ้มค่า',
+        feedbackBad: 'การเผาหรือใช้ครั้งเดียวทิ้งสร้างมลพิษและขยะสะสม เลือกวิธี Reduce-Reuse-Recycle ครับ'
+      }
+    ];
+
+    function renderStage4() {
+      const q = STAGE4_QUESTIONS[state.subStep];
+      const totalQ = STAGE4_QUESTIONS.length;
+      const pct = Math.round(((state.subStep + 1) / totalQ) * 100);
+
+      dom.container.innerHTML = `
+        <div class="space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <span class="px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/40 text-cyan-300 text-xs font-bold">ด่านที่ 4/5 • ข้อที่ ${state.subStep + 1}/${totalQ}</span>
+            <span class="text-xs text-slate-400 font-semibold">ตัวชี้วัด ${q.code}</span>
+          </div>
+
+          <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+            <div class="h-full bg-gradient-to-r from-cyan-400 to-sky-500 transition-all duration-300" style="width: ${pct}%"></div>
+          </div>
+
+          <h2 class="text-xl sm:text-2xl font-bold text-white">${q.title}</h2>
+
+          <div class="grid sm:grid-cols-3 gap-2.5 text-xs">
+            <button id="testPoly" type="button" class="p-3 rounded-xl bg-slate-900/80 border border-cyan-500/30 hover:border-cyan-300 text-left transition">
+              <div class="font-bold text-cyan-300">🧴 ทดสอบพอลิเมอร์</div>
+              <div id="resPoly" class="text-slate-300 mt-1">${state.stage4Tested.polymer ? '⚡ ไม่นำไฟฟ้า | เบา | แบบร่างแหทนร้อน' : 'คลิกดูผลแล็บ'}</div>
+            </button>
+            <button id="testCer" type="button" class="p-3 rounded-xl bg-slate-900/80 border border-cyan-500/30 hover:border-cyan-300 text-left transition">
+              <div class="font-bold text-cyan-300">🏺 ทดสอบเซรามิก</div>
+              <div id="resCer" class="text-slate-300 mt-1">${state.stage4Tested.ceramic ? '⚡ ไม่นำไฟฟ้า | ทนร้อนสูง | แข็งแต่เปราะ' : 'คลิกดูผลแล็บ'}</div>
+            </button>
+            <button id="testMet" type="button" class="p-3 rounded-xl bg-slate-900/80 border border-cyan-500/30 hover:border-cyan-300 text-left transition">
+              <div class="font-bold text-cyan-300">🔩 ทดสอบโลหะ</div>
+              <div id="resMet" class="text-slate-300 mt-1">${state.stage4Tested.metal ? '⚡ นำไฟฟ้า/ความร้อนดี | เหนียวแข็งแรง' : 'คลิกดูผลแล็บ'}</div>
+            </button>
+          </div>
+
+          <div class="space-y-2.5">
+            <p class="text-sm font-semibold text-cyan-200 leading-relaxed">${q.prompt}</p>
+            <div class="grid gap-2.5">
+              ${q.options.map((opt, idx) => `
+                <button type="button" data-idx="${idx}" class="s4-opt btn-option text-left p-3.5 rounded-xl text-sm">${opt.text}</button>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('testPoly').addEventListener('click', () => { SoundFX.click(); state.stage4Tested.polymer = true; render(); });
+      document.getElementById('testCer').addEventListener('click', () => { SoundFX.click(); state.stage4Tested.ceramic = true; render(); });
+      document.getElementById('testMet').addEventListener('click', () => { SoundFX.click(); state.stage4Tested.metal = true; render(); });
+
+      document.querySelectorAll('.s4-opt').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const opt = q.options[Number(btn.dataset.idx)];
+          if (opt.ok) {
+            if (state.subStep < totalQ - 1) {
+              handleAnswer(true, q.feedbackOk, () => {
+                if (q.code.includes('ม.3/1')) markMastered(['ว 2.1 ม.3/1']);
+                state.subStep += 1;
+                render();
+              }, q.ecoBonus || 0);
+            } else {
+              SoundFX.stageClear();
+              handleAnswer(true, q.feedbackOk, () => {
+                markMastered(['ว 2.1 ม.3/1', 'ว 2.1 ม.3/2']);
+                unlockCodex(4);
+                state.stage = 5;
+                state.subStep = 0;
+                state.bossHp = 100;
+                render();
+              }, q.ecoBonus || 0);
+            }
+          } else {
+            handleAnswer(false, q.feedbackBad);
+          }
+        });
+      });
+    }
+
+    // --- STAGE 5: STEM Boss Fight (10 Questions) ---
+    const STAGE5_QUESTIONS = [
+      {
+        code: 'ว 2.1 ม.3/7',
+        title: 'ประโยชน์ของปฏิกิริยาเคมีต่อชีวิตประจำวัน',
+        prompt: 'ข้อใดคือประโยชน์โดยตรงของปฏิกิริยาเคมีในด้านการดำรงชีวิตและอุตสาหกรรม?',
+        options: [
+          { text: 'A. การผลิตยารักษาโรค ปุ๋ย และพลังงานเชื้อเพลิง', ok: true },
+          { text: 'B. การกัดกร่อนรูปปั้นหินอ่อนจากฝนกรดในเมืองใหญ่', ok: false },
+          { text: 'C. การผุกร่อนของโครงสร้างสะพานเหล็กจากสนิม', ok: false },
+          { text: 'D. การเกิดแก๊สคาร์บอนมอนอกไซด์ในห้องเครื่องยนต์ปิด', ok: false }
+        ],
+        feedbackOk: '💥 โจมตีเข้าเป้า! Boss HP ลดลง 10%',
+        feedbackBad: 'ข้ออื่นเป็นผลเสียของปฏิกิริยาเคมี ลองเลือกข้อที่เป็นประโยชน์ครับ'
+      },
+      {
+        code: 'ว 2.1 ม.3/7',
+        title: 'ผลกระทบของฝนกรดต่อสิ่งก่อสร้าง',
+        prompt: 'เหตุใดฝนกรดจึงทำให้โบราณสถานหรือรูปปั้นที่ทำจากหินปูน (แคลเซียมคาร์บอเนต) ผุกร่อนเสียหาย?',
+        options: [
+          { text: 'A. น้ำฝนทำให้หินปูนละลายหายไปเหมือนน้ำตาลทราย', ok: false },
+          { text: 'B. กรดทำปฏิกิริยากับหินปูนเกิดการผุกร่อนและฟองแก๊ส', ok: true },
+          { text: 'C. ฝนกรดทำให้หินปูนเปลี่ยนสภาพเป็นโลหะที่เกิดสนิม', ok: false },
+          { text: 'D. ความเย็นของน้ำฝนทำให้หินปูนหดตัวและระเบิดออก', ok: false }
+        ],
+        feedbackOk: '💥 โจมตีเข้าเป้า! Boss HP ลดลง 10%',
+        feedbackBad: 'กรดในน้ำฝนทำปฏิกิริยาเคมีกับแคลเซียมคาร์บอเนตในหินปูนโดยตรงครับ'
+      },
+      {
+        code: 'ว 2.1 ม.3/7',
+        title: 'อันตรายจากแก๊สคาร์บอนมอนอกไซด์ (CO)',
+        prompt: 'แก๊สคาร์บอนมอนอกไซด์จากการเผาไหม้ไม่สมบูรณ์เป็นอันตรายต่อมนุษย์อย่างไร?',
+        options: [
+          { text: 'A. ทำให้ผิวหนังเปลี่ยนเป็นสีน้ำเงินเมื่อสัมผัสอากาศ', ok: false },
+          { text: 'B. เพิ่มปริมาณออกซิเจนในกระแสเลือดมากเกินความจำเป็น', ok: false },
+          { text: 'C. จับกับฮีโมโกลบินในเลือดแทนออกซิเจนทำให้ขาดอากาศ', ok: true },
+          { text: 'D. ทำให้กระดูกและฟันแข็งตัวผิดปกติในระยะเวลาอันสั้น', ok: false }
+        ],
+        feedbackOk: '💥 โจมตีเข้าเป้า! Boss HP ลดลง 10%',
+        feedbackBad: 'CO แย่งจับกับฮีโมโกลบินในเม็ดเลือดแดง ทำให้ร่างกายขาดออกซิเจนครับ'
+      },
+      {
+        code: 'ว 2.1 ม.3/7',
+        title: 'การป้องกันมลพิษจากโรงไฟฟ้าถ่านหิน',
+        prompt: 'วิธีใดช่วยลดการเกิดฝนกรดจากปล่องควันโรงไฟฟ้าอุตสาหกรรมได้ตรงจุดที่สุด?',
+        options: [
+          { text: 'A. สร้างปล่องควันให้สูงขึ้นอีกเล็กน้อยโดยไม่ติดตั้งตัวกรอง', ok: false },
+          { text: 'B. เพิ่มอุณหภูมิการเผาไหม้ในเตาเผาให้สูงขึ้นเป็นสองเท่า', ok: false },
+          { text: 'C. พ่นน้ำเปล่าใส่อาคารบ้านเรือนทุกวันหลังฝนตก', ok: false },
+          { text: 'D. ติดตั้งระบบดักจับแก๊สซัลเฟอร์ไดออกไซด์ก่อนปล่อยควัน', ok: true }
+        ],
+        feedbackOk: '💥 โจมตีเข้าเป้า! Boss HP ลดลง 10%',
+        feedbackBad: 'ต้องดักจับแก๊สซัลเฟอร์ไดออกไซด์ที่เป็นต้นเหตุของฝนกรดก่อนปล่อยออกสู่บรรยากาศครับ'
+      },
+      {
+        code: 'ว 2.1 ม.3/7',
+        title: 'การลดเขม่าควันจากเครื่องยนต์',
+        prompt: 'การบำรุงรักษาเครื่องยนต์และใช้ตัวเร่งปฏิกิริยา (Catalytic Converter) ในท่อไอเสียมีผลดีอย่างไร?',
+        options: [
+          { text: 'A. เปลี่ยนแก๊สพิษให้เป็นแก๊สที่อันตรายน้อยลงก่อนปล่อยออก', ok: true },
+          { text: 'B. ทำให้เครื่องยนต์ใช้น้ำมันเชื้อเพลิงเพิ่มขึ้นในระยะยาว', ok: false },
+          { text: 'C. เพิ่มปริมาณแก๊สคาร์บอนมอนอกไซด์เพื่อช่วยขับเคลื่อนรถ', ok: false },
+          { text: 'D. ทำให้ท่อไอเสียเกิดสนิมเหล็กได้เร็วขึ้นกว่าปกติ', ok: false }
+        ],
+        feedbackOk: '💥 โจมตีเข้าเป้า! Boss HP ลดลง 10%',
+        feedbackBad: 'Catalytic Converter ช่วยเร่งปฏิกิริยาเปลี่ยนแก๊สพิษให้เป็นแก๊สที่ปลอดภัยขึ้นครับ'
+      },
+      {
+        code: 'ว 2.1 ม.3/8',
+        title: 'STEM Challenge 1: บำบัดน้ำเสียที่มีฤทธิ์เป็นกรด',
+        prompt: 'ต้องออกแบบระบบบำบัดน้ำเสียที่เป็นกรด (pH 3.0) ก่อนปล่อยลงคลอง ควรใช้วิธีบูรณาการ STEM อย่างไร?',
+        options: [
+          { text: 'A. ใช้ท่อเหล็กเปลือยปล่อยน้ำเสียลงคลองโดยตรงให้ธรรมชาติเจือจางเอง', ok: false },
+          { text: 'B. คำนวณปริมาณเบสที่พอดี (M) สะเทินกรด (S) พร้อมเซนเซอร์วัด pH (T/E)', ok: true },
+          { text: 'C. เติมกรดซัลฟิวริกเพิ่มลงไปเพื่อฆ่าเชื้อโรคในน้ำเสียก่อนปล่อย', ok: false },
+          { text: 'D. ต้มน้ำเสียทั้งหมดให้ระเหยเป็นไอน้ำลอยขึ้นสู่อากาศโดยไม่กรอง', ok: false }
+        ],
+        feedbackOk: '💥 คอมโบ STEM! Boss HP ลดลง 10%',
+        feedbackBad: 'การแก้ปัญหาน้ำเสียกรดแบบ STEM ต้องใช้ปฏิกิริยาสะเทิน คำนวณสัดส่วน และวัดค่า pH ครับ'
+      },
+      {
+        code: 'ว 2.1 ม.3/8',
+        title: 'STEM Challenge 2: ออกแบบอุปกรณ์ประคบร้อนปลอดภัย',
+        prompt: 'ในการออกแบบแผ่นประคบร้อนแบบใช้ซ้ำหรือพกพา ควรเลือกวัสดุห่อหุ้มและหลักการใด?',
+        options: [
+          { text: 'A. ห่อด้วยกระดาษบางๆ ที่ซึมน้ำได้เพื่อให้ความร้อนออกเร็วที่สุด', ok: false },
+          { text: 'B. ใช้ปฏิกิริยาดูดความร้อนบรรจุในภาชนะเซรามิกที่เปราะแตกง่าย', ok: false },
+          { text: 'C. ใช้ปฏิกิริยาคายความร้อน คุมสัดส่วนสาร และหุ้มพอลิเมอร์ทนร้อน', ok: true },
+          { text: 'D. ใช้แผ่นโลหะเปลือยสัมผัสผิวหนังโดยตรงที่อุณหภูมิ 90°C', ok: false }
+        ],
+        feedbackOk: '💥 คอมโบ STEM! Boss HP ลดลง 10%',
+        feedbackBad: 'ต้องใช้ปฏิกิริยาคายความร้อน ควบคุมปริมาณสารให้ปลอดภัย และใช้วัสดุหุ้มที่ทนร้อนไม่รั่วซึมครับ'
+      },
+      {
+        code: 'ว 2.1 ม.3/8',
+        title: 'STEM Challenge 3: ลดสนิมในท่อส่งน้ำประปาชุมชน',
+        prompt: 'ชุมชนประสบปัญหาท่อเหล็กเก่าเกิดสนิม ทำให้น้ำขุ่นแดง วิธีแก้ปัญหาทางวิศวกรรมข้อใดคุ้มค่าและปลอดภัย?',
+        options: [
+          { text: 'A. เติมกรดไฮโดรคลอริกลงในน้ำประปาเพื่อล้างสนิมทุกวัน', ok: false },
+          { text: 'B. ทาสีน้ำมันด้านในท่อแล้วเปิดใช้น้ำดื่มทันทีโดยไม่รอแห้ง', ok: false },
+          { text: 'C. ใช้ท่อที่ทำจากพอลิเมอร์ (เช่น PVC/HDPE) หรือเหล็กเคลือบกันสนิม', ok: true },
+          { text: 'D. อัดแก๊สออกซิเจนเข้าไปในท่อน้ำเพิ่มขึ้นเพื่อช่วยฆ่าเชื้อ', ok: false }
+        ],
+        feedbackOk: '💥 คอมโบ STEM! Boss HP ลดลง 10%',
+        feedbackBad: 'ท่อพอลิเมอร์ (PVC/HDPE) ไม่เกิดสนิม หรือใช้ท่อเคลือบกันสนิมจึงจะปลอดภัยและทนทานครับ'
+      },
+      {
+        code: 'ว 2.1 ม.3/8',
+        title: 'STEM Challenge 4: บรรจุภัณฑ์อาหารรักษ์โลก',
+        prompt: 'ต้องการออกแบบกล่องใส่อาหารร้อนที่ลดขยะพลาสติกใช้ครั้งเดียวทิ้ง ข้อใดเหมาะสมที่สุด?',
+        options: [
+          { text: 'A. กล่องโฟมโพลิสไตรีนที่ย่อยสลายยากมากในธรรมชาติ', ok: false },
+          { text: 'B. กล่องโลหะตะกั่วที่นำความร้อนสูงและมีน้ำหนักมาก', ok: false },
+          { text: 'C. ถุงพลาสติกบางที่ไม่ทนความร้อนเมื่อสัมผัสอาหารร้อน', ok: false },
+          { text: 'D. บรรจุภัณฑ์พอลิเมอร์ชีวภาพจากเส้นใยธรรมชาติที่ทนร้อนและย่อยสลายได้', ok: true }
+        ],
+        feedbackOk: '💥 คอมโบ STEM! Boss HP เหลือ 10% เท่านั้น!',
+        feedbackBad: 'บรรจุภัณฑ์อาหารร้อนรักษ์โลกต้องทนร้อน ปลอดภัยต่ออาหาร และย่อยสลายได้ครับ'
+      },
+      {
+        code: 'ว 2.1 ม.3/8',
+        title: 'ท่าไม้ตายสุดท้าย: แผนปฏิบัติการเมืองไร้ควัน',
+        prompt: 'ข้อใดสรุปแนวทางแก้ปัญหามลพิษจากปฏิกิริยาเคมีและวัสดุในเมืองอย่างยั่งยืนครบทุกมิติ?',
+        ecoBonus: 50,
+        options: [
+          { text: 'A. ลดการเผาไหม้ไม่สมบูรณ์ บำบัดแก๊ส/น้ำเสีย และใช้หลัก 3Rs จัดการวัสดุ', ok: true },
+          { text: 'B. หยุดใช้ปฏิกิริยาเคมีและวัสดุสังเคราะห์ทุกชนิดในเมืองทันที', ok: false },
+          { text: 'C. ย้ายโรงงานทั้งหมดไปตั้งริมแม่น้ำเพื่อระบายของเสียได้สะดวก', ok: false },
+          { text: 'D. เผาทำลายขยะพอลิเมอร์ทุกชนิดในเตาเปิดช่วงเวลากลางคืน', ok: false }
+        ],
+        feedbackOk: '🏆 พิชิตบอสครบ 10 ข้อสำเร็จ! กู้เมืองด้วยวิทยาศาสตร์และวิศวกรรมศาสตร์',
+        feedbackBad: 'แนวทางที่ยั่งยืนต้องควบคุมมลพิษ บำบัดของเสีย และจัดการวัสดุอย่างคุ้มค่าครับ'
+      }
+    ];
+
+    function renderStage5() {
+      const q = STAGE5_QUESTIONS[state.subStep];
+      const totalQ = STAGE5_QUESTIONS.length;
+      const pct = Math.round(((state.subStep + 1) / totalQ) * 100);
+
+      dom.container.innerHTML = `
+        <div class="space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <span class="px-3 py-1 rounded-full bg-rose-500/20 border border-rose-400/50 text-rose-300 text-xs font-bold">ด่านที่ 5/5 • FINAL BOSS (${state.subStep + 1}/${totalQ})</span>
+            <span class="text-xs text-slate-400 font-semibold">ตัวชี้วัด ${q.code}</span>
+          </div>
+
+          <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+            <div class="h-full bg-gradient-to-r from-rose-400 to-amber-400 transition-all duration-300" style="width: ${pct}%"></div>
+          </div>
+
+          <div class="p-4 rounded-xl bg-[#071124] border border-rose-500/35 space-y-2">
+            <div class="flex items-center justify-between text-sm font-bold">
+              <span class="text-rose-300">👾 BOSS: Smog &amp; Acid-Rain Core</span>
+              <span class="text-rose-300">HP ${state.bossHp}%</span>
+            </div>
+            <div class="w-full h-3 bg-slate-800 rounded-full overflow-hidden">
+              <div class="h-full bg-gradient-to-r from-rose-500 to-amber-400 transition-all duration-500" style="width: ${state.bossHp}%"></div>
+            </div>
+          </div>
+
+          <h2 class="text-xl font-bold text-white">${q.title}</h2>
+          <p class="text-sm text-slate-300 leading-relaxed">${q.prompt}</p>
+          <div class="grid gap-2.5">
+            ${q.options.map((opt, idx) => `
+              <button type="button" data-idx="${idx}" class="s5-opt btn-option text-left p-3.5 rounded-xl text-sm">${opt.text}</button>
+            `).join('')}
+          </div>
+        </div>
+      `;
+
+      document.querySelectorAll('.s5-opt').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const opt = q.options[Number(btn.dataset.idx)];
+          if (opt.ok) {
+            state.bossHp = Math.max(0, state.bossHp - 10);
+            if (state.subStep < totalQ - 1) {
+              handleAnswer(true, q.feedbackOk, () => {
+                if (q.code.includes('ม.3/7')) markMastered(['ว 2.1 ม.3/7']);
+                if (q.code.includes('ม.3/8')) markMastered(['ว 2.1 ม.3/8']);
+                state.subStep += 1;
+                render();
+              }, q.ecoBonus || 0);
+            } else {
+              state.bossHp = 0;
+              SoundFX.stageClear();
+              handleAnswer(true, q.feedbackOk, () => {
+                markMastered(['ว 2.1 ม.3/7', 'ว 2.1 ม.3/8']);
+                unlockCodex(5);
+                state.stage = 6;
+                render();
+              }, q.ecoBonus || 0);
+            }
+          } else {
+            handleAnswer(false, q.feedbackBad);
+          }
+        });
+      });
+    }
+
+    // --- STAGE 6: Victory, Evaluation Criteria & A4 Landscape Certificate ---
+    function buildCertificateHTML(ev) {
+      const todayTh = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+      return `
+        <div style="width: 100%; max-width: 960px; aspect-ratio: 297 / 210; background: linear-gradient(135deg, #060d1f 0%, #0b1936 55%, #071329 100%); border: 8px double #00e5ff; box-shadow: inset 0 0 0 3px #f59e0b, 0 20px 50px rgba(0,0,0,0.6); padding: 28px 36px; display: flex; flex-direction: column; justify-content: space-between; text-align: center; color: #f8fafc; font-family: 'Noto Sans Thai', 'Inter', sans-serif; position: relative; overflow: hidden;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(0, 229, 255, 0.35); padding-bottom: 10px;">
+            <span style="font-size: 13px; color: #38bdf8; font-weight: 700;">⚗️ CHEMCRAFT M.3 • IPST CURRICULUM</span>
+            <span style="font-size: 13px; color: #fbbf24; font-weight: 700;">รหัสผู้เรียน: ${state.playerCode || 'GUEST'}</span>
+          </div>
+
+          <div style="space-y: 8px; margin: 10px 0;">
+            <div style="font-size: 14px; letter-spacing: 3px; color: #38bdf8; font-weight: 700; text-transform: uppercase;">CERTIFICATE OF ACHIEVEMENT</div>
+            <h1 style="font-size: 32px; font-weight: 800; color: #ffffff; margin: 6px 0;">เกียรติบัตรรับรองผลการเรียนรู้</h1>
+            <p style="font-size: 14px; color: #cbd5e1;">ขอมอบเกียรติบัตรฉบับนี้ให้ไว้เพื่อแสดงว่า</p>
+            <div style="font-size: 30px; font-weight: 800; color: #00e5ff; margin: 8px 0; text-decoration: underline; text-decoration-color: rgba(251,191,36,0.6); text-underline-offset: 6px;">
+              ${state.playerName}
+            </div>
+            <p style="font-size: 14px; color: #e2e8f0; max-width: 680px; margin: 0 auto; line-height: 1.6;">
+              ได้ผ่านการเรียนรู้และทดสอบทักษะเรื่อง <strong>ปฏิกิริยาเคมีและวัสดุในชีวิตประจำวัน (ม.3)</strong><br/>
+              ตามหลักสูตร สสวท. มาตรฐาน ว 2.1 ม.3/1 – ม.3/8 ครบทั้ง 5 ด่าน
+            </p>
+            <div style="display: inline-block; margin-top: 10px; padding: 8px 24px; border-radius: 999px; background: rgba(245, 158, 11, 0.18); border: 2px solid #fbbf24; color: #fde68a; font-size: 18px; font-weight: 800;">
+              ระดับผลการประเมิน: ${ev.level} (${ev.percent}% • ${ev.totalScore}/5,000 คะแนน)
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid rgba(0, 229, 255, 0.35); padding-top: 12px; font-size: 12px; color: #cbd5e1;">
+            <div style="text-align: left;">
+              <div>ให้ไว้ ณ วันที่ ${todayTh}</div>
+              <div style="color: #38bdf8;">Eco-Points สะสม: ${state.ecoPoints} คะแนน</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="border-bottom: 1px solid #94a3b8; width: 170px; margin-bottom: 4px; height: 18px;"></div>
+              <div>ครูผู้สอนวิชาวิทยาศาสตร์ ม.3</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderVictory() {
+      const ev = getEvalResult();
+      const hasSheet = Boolean(getSheetUrl().trim());
+      if (hasSheet) {
+        sendToGoogleSheet('สรุปผลครบ 5 ด่าน');
+      }
+      try {
+        localStorage.setItem('chemcraft_m3_best', String(Math.max(Number(localStorage.getItem('chemcraft_m3_best') || 0), ev.totalScore)));
+      } catch (_) {}
+
+      const stageNames = [
+        'ด่าน 1: อะตอมและกฎทรงมวล',
+        'ด่าน 2: ดูด-คายความร้อน',
+        'ด่าน 3: กรด-เบส และสนิม',
+        'ด่าน 4: วัสดุรอบตัว',
+        'ด่าน 5: บอส STEM กู้เมือง'
+      ];
+
+      const certHtml = ev.passed ? buildCertificateHTML(ev) : '';
+      document.getElementById('certPrintArea').innerHTML = certHtml;
+
+      dom.container.innerHTML = `
+        <div class="space-y-6">
+          <div class="text-center space-y-2">
+            <div class="text-5xl">${ev.passed ? '🏆' : '📚'}</div>
+            <h2 class="text-2xl sm:text-3xl font-extrabold ${ev.passed ? 'text-cyan-300' : 'text-amber-300'}">
+              ${ev.passed ? 'ยินดีด้วย! ผ่านเกณฑ์การประเมินครบ 5 ด่าน' : 'คะแนนยังไม่ถึงเกณฑ์ 60%'}
+            </h2>
+            <p class="text-sm text-slate-300">
+              ผู้เล่น: <strong class="text-white">${state.playerName}</strong> (${state.playerCode || 'GUEST'}) |
+              <span class="inline-block px-2.5 py-0.5 rounded-full border text-xs font-extrabold ${ev.badgeColor}">
+                ระดับ: ${ev.level} (${ev.percent}%)
+              </span>
+            </p>
+            <div class="text-xs ${hasSheet ? 'text-emerald-300' : 'text-slate-400'}">
+              ${hasSheet ? '☁️ ส่งคะแนนเข้า Google Sheet แบบ Real-Time แล้ว' : 'ℹ️ ยังไม่ได้เชื่อม Google Sheet (ตั้งค่าได้ที่หน้าแรก)'}
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-3 text-center">
+            <div class="p-3 rounded-xl bg-slate-900/80 border border-cyan-500/30">
+              <div class="text-xs text-slate-400">คะแนนรวม</div>
+              <div class="text-xl font-extrabold text-cyan-300">${ev.totalScore}/5000</div>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/80 border border-amber-500/30">
+              <div class="text-xs text-slate-400">คิดเป็นร้อยละ</div>
+              <div class="text-xl font-extrabold text-amber-300">${ev.percent}%</div>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/80 border border-emerald-500/30">
+              <div class="text-xs text-slate-400">Eco-Points</div>
+              <div class="text-xl font-extrabold text-emerald-300">${state.ecoPoints}</div>
+            </div>
+          </div>
+
+          <!-- Per-stage breakdown & Replay low-scoring stages -->
+          <div class="space-y-2">
+            <h3 class="text-sm font-bold text-cyan-200">
+              📊 คะแนนรายด่าน ${ev.passed ? '(กดเล่นซ้ำเพื่ออัปเกรดระดับคะแนนได้)' : '(กรุณากดทบทวนเล่นด่านที่คะแนนน้อยกว่า 600 เพื่อทำคะแนนใหม่)'}
+            </h3>
+            <div class="grid sm:grid-cols-2 gap-2 text-xs">
+              ${[1, 2, 3, 4, 5].map((sNum, idx) => {
+                const sc = state.stageScores[sNum] || 0;
+                const low = sc < 600;
+                return `
+                  <div class="p-3 rounded-xl bg-[#071124] border ${low ? 'border-rose-500/50' : 'border-emerald-500/35'} flex items-center justify-between gap-2">
+                    <div>
+                      <div class="font-bold ${low ? 'text-rose-300' : 'text-cyan-300'}">${stageNames[idx]}</div>
+                      <div class="text-slate-300">คะแนน: <strong>${sc}/1,000</strong> (${Math.round(sc / 10)}%)</div>
+                    </div>
+                    <button type="button" data-replay="${sNum}" class="btn-replay-stage shrink-0 px-3 py-1.5 rounded-lg ${low ? 'bg-rose-500/25 hover:bg-rose-500/40 border border-rose-400/60 text-rose-200' : 'bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200'} font-bold transition">
+                      🔄 เล่นด่านนี้ใหม่
+                    </button>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+
+          ${ev.passed ? `
+            <div class="space-y-3">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <h3 class="text-sm font-bold text-amber-300">🎓 เกียรติบัตรของคุณ (ขนาด A4 แนวนอน)</h3>
+                <button id="btnPrintCert" type="button" class="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 font-extrabold text-xs sm:text-sm transition cyan-glow">
+                  🖨️ พิมพ์ / บันทึกเป็น PDF (A4 แนวนอน)
+                </button>
+              </div>
+              <div class="rounded-xl overflow-hidden border border-cyan-500/30 shadow-2xl">
+                ${certHtml}
+              </div>
+            </div>
+          ` : `
+            <div class="p-4 rounded-xl bg-rose-500/10 border border-rose-400/40 text-center space-y-1">
+              <div class="font-bold text-rose-300 text-sm">🔒 เกียรติบัตรยังไม่ปลดล็อก (ต้องได้คะแนนรวม ≥ 60% หรือ 3,000/5,000 คะแนน)</div>
+              <div class="text-xs text-slate-300">แนะนำให้กดปุ่ม <strong>"🔄 เล่นด่านนี้ใหม่"</strong> ในด่านที่ได้คะแนนน้อยกว่า 600 เพื่อทำคะแนนเพิ่มได้เลยครับ</div>
+            </div>
+          `}
+
+          <div class="flex flex-wrap justify-center gap-3 pt-2">
+            <button id="btnCopySummary" type="button" class="px-5 py-2.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/50 text-cyan-200 font-bold text-sm transition">
+              📋 คัดลอกสรุปคะแนนส่งครู
+            </button>
+            <button id="btnCopySaveToken" type="button" class="px-5 py-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/50 text-emerald-200 font-bold text-sm transition">
+              🔑 คัดลอกรหัสเซฟข้ามเครื่อง
+            </button>
+            <button id="btnPlayAgain" type="button" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-sky-500 hover:from-cyan-300 hover:to-sky-400 text-slate-950 font-extrabold text-sm transition">
+              🔄 กลับหน้าแรก
+            </button>
+          </div>
+        </div>
+      `;
+
+      document.querySelectorAll('.btn-replay-stage').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const sNum = Number(btn.dataset.replay);
+          SoundFX.click();
+          state.stageScores[sNum] = 0;
+          state.score = Object.values(state.stageScores).reduce((a, b) => a + Number(b || 0), 0);
+          state.hp = 100;
+          state.wrongInCurrentQ = 0;
+          state.replayMode = true;
+          state.stage = sNum;
+          state.subStep = 0;
+          if (sNum === 2) state.stage2Temp = 28;
+          if (sNum === 5) state.bossHp = 100;
+          render();
+        });
+      });
+
+      const printBtn = document.getElementById('btnPrintCert');
+      if (printBtn) {
+        printBtn.addEventListener('click', () => {
+          SoundFX.click();
+          window.print();
+        });
+      }
+
+      document.getElementById('btnCopySummary').addEventListener('click', () => {
+        SoundFX.click();
+        const summary = `ChemCraft M.3 (สสวท.) | รหัส: ${state.playerCode || 'GUEST'} | ผู้เล่น: ${state.playerName} | คะแนน: ${ev.totalScore}/5000 (${ev.percent}%) | ระดับ: ${ev.level} | Eco-Points: ${state.ecoPoints}`;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(summary).then(() => showToast('คัดลอกสรุปผลเรียบร้อย!', 'success')).catch(() => fallbackCopy(summary));
+        } else {
+          fallbackCopy(summary);
+        }
+      });
+
+      document.getElementById('btnCopySaveToken').addEventListener('click', () => {
+        SoundFX.click();
+        const tok = exportSaveToken();
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(tok).then(() => showToast('คัดลอกรหัสเซฟข้ามเครื่องแล้ว!', 'success')).catch(() => fallbackCopy(tok));
+        } else {
+          fallbackCopy(tok);
+        }
+      });
+
+      document.getElementById('btnPlayAgain').addEventListener('click', () => {
+        SoundFX.click();
+        state.stage = 0;
+        render();
+      });
+    }
+
+    function fallbackCopy(text) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        showToast('คัดลอกสรุปผลเรียบร้อย!', 'success');
+      } catch (_) {
+        showToast('ไม่สามารถคัดลอกอัตโนมัติได้', 'error');
+      }
+      document.body.removeChild(ta);
+    }
+
+    function render() {
+      updateHUD();
+      saveProgress();
+      if (state.stage === 0) renderStart();
+      else if (state.stage === 1) renderStage1();
+      else if (state.stage === 2) renderStage2();
+      else if (state.stage === 3) renderStage3();
+      else if (state.stage === 4) renderStage4();
+      else if (state.stage === 5) renderStage5();
+      else renderVictory();
+    }
+
+    // --- Modal, Switch Account & Mute Listeners ---
+    dom.btnSwitchAccount.addEventListener('click', () => {
+      SoundFX.click();
+      saveProgress();
+      state.stage = 0;
+      render();
+    });
+    document.getElementById('btnCodex').addEventListener('click', () => {
+      SoundFX.click();
+      dom.codexBody.innerHTML = CODEX_ENTRIES.map((entry) => {
+        const unlocked = state.unlockedCodex.includes(entry.stage);
+        return unlocked
+          ? `<div class="p-3.5 rounded-xl bg-slate-900/90 border border-cyan-500/35">
+              <div class="flex items-center justify-between text-xs text-cyan-300 font-bold mb-1">
+                <span>ด่านที่ ${entry.stage}: ${entry.title}</span>
+                <span>${entry.code}</span>
+              </div>
+              <p class="text-slate-300 text-xs leading-relaxed">${entry.summary}</p>
+            </div>`
+          : `<div class="p-3.5 rounded-xl bg-slate-900/40 border border-slate-700/50 text-slate-500 text-xs">
+              🔒 ด่านที่ ${entry.stage}: ${entry.title} (ผ่านด่านเพื่อปลดล็อก)
+            </div>`;
+      }).join('');
+      dom.codexModal.classList.remove('hidden');
+      dom.codexModal.classList.add('flex');
+    });
+
+    document.getElementById('btnCloseCodex').addEventListener('click', () => {
+      SoundFX.click();
+      dom.codexModal.classList.add('hidden');
+      dom.codexModal.classList.remove('flex');
+    });
+
+    document.getElementById('btnCloseTeacherModal').addEventListener('click', () => {
+      SoundFX.click();
+      const tm = document.getElementById('teacherModal');
+      tm.classList.add('hidden');
+      tm.classList.remove('flex');
+    });
+
+    document.getElementById('btnSaveSheetUrl').addEventListener('click', () => {
+      const val = document.getElementById('sheetUrlInput').value.trim();
+      if (val && !val.startsWith('https://')) {
+        showToast('URL ต้องขึ้นต้นด้วย https:// เท่านั้น', 'error');
+        return;
+      }
+      try {
+        localStorage.setItem(SHEET_URL_KEY, val);
+        SoundFX.correct();
+        showToast(val ? 'บันทึก URL ของ Google Sheet เรียบร้อย!' : 'ล้างการเชื่อมต่อ Google Sheet แล้ว', 'success');
+      } catch (_) {}
+    });
+
+    document.getElementById('btnCopyAppsScript').addEventListener('click', () => {
+      SoundFX.click();
+      const gasCode = `function doPost(e) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(["Timestamp","PlayerCode","PlayerName","Event","Stage","TotalScore","Percent","Level","EcoPoints","HP","S1","S2","S3","S4","S5"]);
+  }
+  var d = JSON.parse(e.postData.contents);
+  sheet.appendRow([d.timestamp, d.playerCode, d.playerName, d.event, d.stage, d.totalScore, d.percent, d.level, d.ecoPoints, d.hp, d.s1, d.s2, d.s3, d.s4, d.s5]);
+  return ContentService.createTextOutput(JSON.stringify({status:"ok"})).setMimeType(ContentService.MimeType.JSON);
+}`;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(gasCode).then(() => showToast('คัดลอกโค้ด Google Apps Script แล้ว!', 'success')).catch(() => fallbackCopy(gasCode));
+      } else {
+        fallbackCopy(gasCode);
+      }
+    });
+
+    dom.btnMute.addEventListener('click', () => {
+      state.muted = !state.muted;
+      dom.btnMute.textContent = state.muted ? '🔇' : '🔊';
+      if (!state.muted) SoundFX.click();
+    });
+
+    // --- Ambient Deep Navy / Electric Cyan Particle Background ---
+    function initBgParticles() {
+      const canvas = document.getElementById('bgCanvas');
+      const ctx = canvas.getContext('2d');
+      let w = 0, h = 0;
+      const dots = Array.from({ length: 28 }, () => ({
+        x: Math.random(),
+        y: Math.random(),
+        vx: (Math.random() - 0.5) * 0.0004,
+        vy: (Math.random() - 0.5) * 0.0004,
+        r: Math.random() * 2 + 1
+      }));
+
+      function resize() {
+        w = canvas.width = window.innerWidth;
+        h = canvas.height = window.innerHeight;
+      }
+      window.addEventListener('resize', resize);
+      resize();
+
+      function tick() {
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = 'rgba(0, 229, 255, 0.28)';
+        dots.forEach((d) => {
+          d.x = (d.x + d.vx + 1) % 1;
+          d.y = (d.y + d.vy + 1) % 1;
+          ctx.beginPath();
+          ctx.arc(d.x * w, d.y * h, d.r, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        requestAnimationFrame(tick);
+      }
+      tick();
+    }
+
+    window.onload = () => {
+      initBgParticles();
+      render();
+    };
+  </script>
+</body>
+</html>

@@ -476,7 +476,7 @@
       return `<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8"><style>@page{size:A4 landscape;margin:0;}body{margin:0;padding:12mm;background:#ffffff;display:flex;align-items:center;justify-content:center;font-family:'Angsana New','AngsanaUPC','Sarabun',sans-serif;}</style></head><body>${certBody}</body></html>`;
     }
 
-    async function sendToGoogleSheet(eventLabel) {
+    async function sendToGoogleSheet(eventLabel, includeCert = false) {
       const url = getSheetUrl().trim();
       if (!url || !url.startsWith('https://')) return false;
       const ev = getEvalResult();
@@ -500,7 +500,8 @@
         certDate: new Date().toLocaleDateString('th-TH-u-nu-latn', { year: 'numeric', month: 'long', day: 'numeric' }),
         teacherName: getTeacherName(),
         certSummary: ev.passed ? `มอบเกียรติบัตรแก่ ${state.playerName} (${state.playerCode || 'GUEST'}) ระดับ ${ev.level} (${ev.percent}%)` : '-',
-        certHtml: ev.passed ? buildPrintableCertDoc(ev) : ''
+        saveCert: Boolean(includeCert && ev.passed),
+        certHtml: (includeCert && ev.passed) ? buildPrintableCertDoc(ev) : ''
       };
       try {
         await fetch(url, {
@@ -587,7 +588,11 @@
         if (ecoBonus > 0) state.ecoPoints += ecoBonus;
         updateHUD();
         showToast(`${feedbackText} (+${earned} คะแนน)`, 'success');
+        const prevStage = state.stage;
         onSuccess();
+        if (state.stage !== prevStage && prevStage >= 1 && prevStage <= 5) {
+          sendToGoogleSheet(`ผ่านด่านที่ ${prevStage}`, false);
+        }
       } else {
         SoundFX.wrong();
         state.wrongInCurrentQ += 1;
@@ -2174,7 +2179,7 @@
 
           <div class="flex flex-wrap justify-center gap-3 pt-2">
             <button id="btnSubmitToTeacher" type="button" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-300 hover:to-teal-400 text-slate-950 font-extrabold text-sm transition cyan-glow">
-              📤 ส่งคะแนนและเกียรติบัตรให้ครู
+              📤 ส่งเกียรติบัตร (PDF) ให้ครู
             </button>
             <button id="btnCopySummary" type="button" class="px-5 py-2.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/50 text-cyan-200 font-bold text-sm transition">
               📋 คัดลอกสรุปคะแนนส่งครู
@@ -2212,7 +2217,7 @@
         const statusEl = document.getElementById('sheetSubmitStatus');
         btnSub.disabled = true;
         btnSub.textContent = '⏳ กำลังส่งข้อมูลให้ครู...';
-        const ok = await sendToGoogleSheet('นักเรียนกดส่งคะแนนและเกียรติบัตร');
+        const ok = await sendToGoogleSheet('นักเรียนกดส่งเกียรติบัตร PDF ให้ครู', true);
         if (ok) {
           SoundFX.stageClear();
           btnSub.disabled = false;
@@ -2224,7 +2229,7 @@
           showToast('ส่งคะแนนและเกียรติบัตรให้ครูเรียบร้อยแล้ว!', 'success');
         } else {
           btnSub.disabled = false;
-          btnSub.textContent = '📤 ส่งคะแนนและเกียรติบัตรให้ครู';
+          btnSub.textContent = '📤 ส่งเกียรติบัตร (PDF) ให้ครู';
           showToast('ยังไม่ได้ตั้งค่า Google Sheet URL ในหน้าตั้งค่าครู', 'error');
         }
       });
@@ -2379,7 +2384,7 @@
     var d = JSON.parse(e.postData.contents);
     var code = String(d.playerCode || "").trim().toUpperCase();
     var pdfLinkFormula = "";
-    if (String(d.certStatus || "").indexOf("ผ่านเกณฑ์") !== -1 && d.certHtml) {
+    if (d.saveCert === true && String(d.certStatus || "").indexOf("ผ่านเกณฑ์") !== -1 && d.certHtml) {
       var folders = DriveApp.getFoldersByName("ChemCraft_M3_Certificates");
       var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder("ChemCraft_M3_Certificates");
       var pdfName = "Certificate_" + code + ".pdf";
@@ -2405,7 +2410,10 @@
     } else {
       sheet.appendRow(rowData);
     }
-    if (String(d.certStatus || "").indexOf("ผ่านเกณฑ์") !== -1) {
+    if (foundRow > 0 && !pdfLinkFormula && values[foundRow - 1].length >= 20 && values[foundRow - 1][19]) {
+      sheet.getRange(foundRow, 20).setValue(values[foundRow - 1][19]);
+    }
+    if (d.saveCert === true && String(d.certStatus || "").indexOf("ผ่านเกณฑ์") !== -1) {
       var certSheet = ss.getSheetByName("Certificates") || ss.insertSheet("Certificates");
       if (certSheet.getLastRow() === 0) {
         certSheet.appendRow(["CertDate","PlayerCode","PlayerName","Level","Percent","TotalScore","TeacherName","CertSummary","CertPDF"]);

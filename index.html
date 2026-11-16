@@ -2373,6 +2373,11 @@
     document.getElementById('btnCopyAppsScript').addEventListener('click', () => {
       SoundFX.click();
       const gasCode = `function doPost(e) {
+  if (!e || !e.postData) {
+    var f = DriveApp.getFoldersByName("ChemCraft_M3_Certificates");
+    if (!f.hasNext()) DriveApp.createFolder("ChemCraft_M3_Certificates");
+    return ContentService.createTextOutput("Authorized & Ready!");
+  }
   var lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -2380,6 +2385,8 @@
     var sheet = ss.getSheets()[0];
     if (sheet.getLastRow() === 0) {
       sheet.appendRow(["Timestamp","PlayerCode","PlayerName","Event","Stage","TotalScore","Percent","Level","EcoPoints","HP","S1","S2","S3","S4","S5","CertStatus","CertDate","TeacherName","CertSummary","CertPDF"]);
+    } else if (!sheet.getRange(1, 20).getValue()) {
+      sheet.getRange(1, 20).setValue("CertPDF");
     }
     var d = JSON.parse(e.postData.contents);
     var code = String(d.playerCode || "").trim().toUpperCase();
@@ -2417,6 +2424,8 @@
       var certSheet = ss.getSheetByName("Certificates") || ss.insertSheet("Certificates");
       if (certSheet.getLastRow() === 0) {
         certSheet.appendRow(["CertDate","PlayerCode","PlayerName","Level","Percent","TotalScore","TeacherName","CertSummary","CertPDF"]);
+      } else if (!certSheet.getRange(1, 9).getValue()) {
+        certSheet.getRange(1, 9).setValue("CertPDF");
       }
       var certData = [d.certDate, code, d.playerName, d.level, d.percent, d.totalScore, d.teacherName, d.certSummary, pdfLinkFormula];
       var cVals = certSheet.getDataRange().getValues();

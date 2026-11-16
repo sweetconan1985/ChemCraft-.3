@@ -471,6 +471,11 @@
       return { totalScore, percent, level: 'ไม่ผ่านเกณฑ์', passed: false, badgeColor: 'text-rose-300 border-rose-400/50 bg-rose-500/15' };
     }
 
+    function buildPrintableCertDoc(ev) {
+      const certBody = buildCertificateHTML(ev);
+      return `<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8"><style>@page{size:A4 landscape;margin:0;}body{margin:0;padding:12mm;background:#ffffff;display:flex;align-items:center;justify-content:center;font-family:'Angsana New','AngsanaUPC','Sarabun',sans-serif;}</style></head><body>${certBody}</body></html>`;
+    }
+
     async function sendToGoogleSheet(eventLabel) {
       const url = getSheetUrl().trim();
       if (!url || !url.startsWith('https://')) return false;
@@ -494,7 +499,8 @@
         certStatus: ev.passed ? 'ผ่านเกณฑ์ (รับเกียรติบัตร)' : 'ยังไม่ผ่านเกณฑ์',
         certDate: new Date().toLocaleDateString('th-TH-u-nu-latn', { year: 'numeric', month: 'long', day: 'numeric' }),
         teacherName: getTeacherName(),
-        certSummary: ev.passed ? `มอบเกียรติบัตรแก่ ${state.playerName} (${state.playerCode || 'GUEST'}) ระดับ ${ev.level} (${ev.percent}%)` : '-'
+        certSummary: ev.passed ? `มอบเกียรติบัตรแก่ ${state.playerName} (${state.playerCode || 'GUEST'}) ระดับ ${ev.level} (${ev.percent}%)` : '-',
+        certHtml: ev.passed ? buildPrintableCertDoc(ev) : ''
       };
       try {
         await fetch(url, {
@@ -581,11 +587,7 @@
         if (ecoBonus > 0) state.ecoPoints += ecoBonus;
         updateHUD();
         showToast(`${feedbackText} (+${earned} คะแนน)`, 'success');
-        const prevStage = state.stage;
         onSuccess();
-        if (state.stage !== prevStage) {
-          sendToGoogleSheet(`ผ่านด่านที่ ${prevStage}`);
-        }
       } else {
         SoundFX.wrong();
         state.wrongInCurrentQ += 1;
@@ -2038,7 +2040,7 @@
     function buildCertificateHTML(ev) {
       const todayTh = new Date().toLocaleDateString('th-TH-u-nu-latn', { year: 'numeric', month: 'long', day: 'numeric' });
       return `
-        <div style="width: 100%; max-width: 960px; aspect-ratio: 297 / 210; background: #ffffff; border: 8px double #1e3a8a; box-shadow: inset 0 0 0 3px #2563eb, 0 12px 32px rgba(0,0,0,0.25); padding: 28px 40px; display: flex; flex-direction: column; justify-content: space-between; text-align: center; color: #1e3a8a; font-family: 'TH SarabunPSK', 'Sarabun', 'Noto Sans Thai', sans-serif; position: relative; overflow: hidden;">
+        <div style="width: 100%; max-width: 960px; aspect-ratio: 297 / 210; background: #ffffff; border: 8px double #1e3a8a; box-shadow: inset 0 0 0 3px #2563eb, 0 12px 32px rgba(0,0,0,0.25); padding: 28px 40px; display: flex; flex-direction: column; justify-content: space-between; text-align: center; color: #1e3a8a; font-family: 'Angsana New', 'AngsanaUPC', 'Sarabun', 'Noto Sans Thai', sans-serif; position: relative; overflow: hidden;">
           <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #93c5fd; padding-bottom: 8px;">
             <span style="font-size: 18px; color: #1e40af; font-weight: 700;">⚗️ CHEMCRAFT M.3 • หลักสูตร สสวท.</span>
             <span style="font-size: 18px; color: #1e3a8a; font-weight: 700;">รหัสผู้เรียน: ${state.playerCode || 'GUEST'}</span>
@@ -2078,9 +2080,7 @@
     function renderVictory() {
       const ev = getEvalResult();
       const hasSheet = Boolean(getSheetUrl().trim());
-      if (hasSheet) {
-        sendToGoogleSheet('สรุปผลครบ 5 ด่าน');
-      }
+
       try {
         localStorage.setItem('chemcraft_m3_best', String(Math.max(Number(localStorage.getItem('chemcraft_m3_best') || 0), ev.totalScore)));
       } catch (_) {}
@@ -2109,8 +2109,8 @@
                 ระดับ: ${ev.level} (${ev.percent}%)
               </span>
             </p>
-            <div class="text-xs ${hasSheet ? 'text-emerald-300' : 'text-slate-400'}">
-              ${hasSheet ? '☁️ ส่งคะแนนเข้า Google Sheet แบบ Real-Time แล้ว' : 'ℹ️ ยังไม่ได้เชื่อม Google Sheet (ตั้งค่าได้ที่หน้าแรก)'}
+            <div id="sheetSubmitStatus" class="text-xs ${hasSheet ? 'text-cyan-300' : 'text-slate-400'}">
+              ${hasSheet ? '📌 สามารถเล่นซ้ำเพื่อเพิ่มคะแนนได้ ก่อนกดปุ่ม "ส่งคะแนนและเกียรติบัตรให้ครู" ด้านล่าง' : 'ℹ️ ยังไม่ได้เชื่อม Google Sheet (ตั้งค่าได้ที่หน้าแรก)'}
             </div>
           </div>
 
@@ -2173,6 +2173,9 @@
           `}
 
           <div class="flex flex-wrap justify-center gap-3 pt-2">
+            <button id="btnSubmitToTeacher" type="button" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-300 hover:to-teal-400 text-slate-950 font-extrabold text-sm transition cyan-glow">
+              📤 ส่งคะแนนและเกียรติบัตรให้ครู
+            </button>
             <button id="btnCopySummary" type="button" class="px-5 py-2.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/50 text-cyan-200 font-bold text-sm transition">
               📋 คัดลอกสรุปคะแนนส่งครู
             </button>
@@ -2201,6 +2204,29 @@
           if (sNum === 5) state.bossHp = 100;
           render();
         });
+      });
+
+      document.getElementById('btnSubmitToTeacher').addEventListener('click', async () => {
+        SoundFX.click();
+        const btnSub = document.getElementById('btnSubmitToTeacher');
+        const statusEl = document.getElementById('sheetSubmitStatus');
+        btnSub.disabled = true;
+        btnSub.textContent = '⏳ กำลังส่งข้อมูลให้ครู...';
+        const ok = await sendToGoogleSheet('นักเรียนกดส่งคะแนนและเกียรติบัตร');
+        if (ok) {
+          SoundFX.stageClear();
+          btnSub.disabled = false;
+          btnSub.textContent = '✅ ส่งให้ครูแล้ว (กดส่งซ้ำได้หากอัปเดตคะแนน)';
+          if (statusEl) {
+            statusEl.className = 'text-xs text-emerald-300 font-semibold';
+            statusEl.textContent = '☁️ ส่งคะแนนและไฟล์เกียรติบัตร PDF เข้า Google Sheet ของครูเรียบร้อยแล้ว!';
+          }
+          showToast('ส่งคะแนนและเกียรติบัตรให้ครูเรียบร้อยแล้ว!', 'success');
+        } else {
+          btnSub.disabled = false;
+          btnSub.textContent = '📤 ส่งคะแนนและเกียรติบัตรให้ครู';
+          showToast('ยังไม่ได้ตั้งค่า Google Sheet URL ในหน้าตั้งค่าครู', 'error');
+        }
       });
 
       const printBtn = document.getElementById('btnPrintCert');
@@ -2348,11 +2374,24 @@
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheets()[0];
     if (sheet.getLastRow() === 0) {
-      sheet.appendRow(["Timestamp","PlayerCode","PlayerName","Event","Stage","TotalScore","Percent","Level","EcoPoints","HP","S1","S2","S3","S4","S5","CertStatus","CertDate","TeacherName","CertSummary"]);
+      sheet.appendRow(["Timestamp","PlayerCode","PlayerName","Event","Stage","TotalScore","Percent","Level","EcoPoints","HP","S1","S2","S3","S4","S5","CertStatus","CertDate","TeacherName","CertSummary","CertPDF"]);
     }
     var d = JSON.parse(e.postData.contents);
     var code = String(d.playerCode || "").trim().toUpperCase();
-    var rowData = [d.timestamp, code, d.playerName, d.event, d.stage, d.totalScore, d.percent, d.level, d.ecoPoints, d.hp, d.s1, d.s2, d.s3, d.s4, d.s5, d.certStatus || "", d.certDate || "", d.teacherName || "", d.certSummary || ""];
+    var pdfLinkFormula = "";
+    if (String(d.certStatus || "").indexOf("ผ่านเกณฑ์") !== -1 && d.certHtml) {
+      var folders = DriveApp.getFoldersByName("ChemCraft_M3_Certificates");
+      var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder("ChemCraft_M3_Certificates");
+      var pdfName = "Certificate_" + code + ".pdf";
+      var oldFiles = folder.getFilesByName(pdfName);
+      while (oldFiles.hasNext()) { oldFiles.next().setTrashed(true); }
+      var pdfBlob = Utilities.newBlob(d.certHtml, "text/html", "cert.html").getAs("application/pdf");
+      pdfBlob.setName(pdfName);
+      var pdfFile = folder.createFile(pdfBlob);
+      pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      pdfLinkFormula = '=HYPERLINK("' + pdfFile.getUrl() + '", "📄 เปิดเกียรติบัตร PDF")';
+    }
+    var rowData = [d.timestamp, code, d.playerName, d.event, d.stage, d.totalScore, d.percent, d.level, d.ecoPoints, d.hp, d.s1, d.s2, d.s3, d.s4, d.s5, d.certStatus || "", d.certDate || "", d.teacherName || "", d.certSummary || "", pdfLinkFormula];
     var values = sheet.getDataRange().getValues();
     var foundRow = -1;
     for (var i = 1; i < values.length; i++) {
@@ -2369,9 +2408,9 @@
     if (String(d.certStatus || "").indexOf("ผ่านเกณฑ์") !== -1) {
       var certSheet = ss.getSheetByName("Certificates") || ss.insertSheet("Certificates");
       if (certSheet.getLastRow() === 0) {
-        certSheet.appendRow(["CertDate","PlayerCode","PlayerName","Level","Percent","TotalScore","TeacherName","CertSummary"]);
+        certSheet.appendRow(["CertDate","PlayerCode","PlayerName","Level","Percent","TotalScore","TeacherName","CertSummary","CertPDF"]);
       }
-      var certData = [d.certDate, code, d.playerName, d.level, d.percent, d.totalScore, d.teacherName, d.certSummary];
+      var certData = [d.certDate, code, d.playerName, d.level, d.percent, d.totalScore, d.teacherName, d.certSummary, pdfLinkFormula];
       var cVals = certSheet.getDataRange().getValues();
       var cRow = -1;
       for (var j = 1; j < cVals.length; j++) {
